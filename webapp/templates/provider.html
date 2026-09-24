@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}{{ prefix }}: &mdash; ir-datasets.com{% endblock %}
+{% block content %}
+<h1><code>{{ prefix }}:</code></h1>
+
+<section class="meta-grid">
+  <div><span class="k">Package</span><span class="v">{{ provider.package or '&mdash;' }}</span></div>
+  <div><span class="k">Nodes</span><span class="v">{{ rows|length }}</span></div>
+  <div><span class="k">Node types declared</span><span class="v">
+    {% for t in manifest.types.keys()|sort %}<code>{{ t }}</code>{% if not loop.last %}, {% endif %}{% endfor %}
+  </span></div>
+  <div><span class="k">Edge kinds declared</span><span class="v">
+    {% for k, info in manifest.edge_kinds.items()|sort %}<code>{{ k }}</code>{{ ' (structural)' if info.structural else '' }}{% if not loop.last %}, {% endif %}{% endfor %}
+  </span></div>
+  <div><span class="k">Defaultable fields</span><span class="v">{{ manifest.defaultable|join(', ') or '&mdash;' }}</span></div>
+</section>
+
+{% if manifest.aliases %}
+<h2>Legacy aliases</h2>
+<table class="node-list">
+<thead><tr><th>Legacy id</th><th>Resolves to</th></tr></thead>
+<tbody>
+{% for legacy, target in manifest.aliases.items()|sort %}
+<tr><td><code>{{ legacy }}</code></td><td><a href="{{ node_url(target) }}"><code>{{ target }}</code></a></td></tr>
+{% endfor %}
+</tbody>
+</table>
+{% endif %}
+
+<h2>Nodes</h2>
+<table class="node-list">
+<thead><tr><th>Name</th><th>Type</th></tr></thead>
+<tbody>
+{% for name, type in rows %}
+<tr><td><a href="{{ node_url(name) }}"><code>{{ name }}</code></a></td><td>{{ type_label(type) }}</td></tr>
+{% endfor %}
+</tbody>
+</table>
+{% endblock %}

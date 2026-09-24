@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}{{ node.qualified_name }} &mdash; ir-datasets.com{% endblock %}
+{% block content %}
+{{ m.node_header(node) }}
+
+<table class="meta-table">
+<tbody>
+{% if node.metadata.size %}<tr><td class="k">Size</td><td class="v">{{ '%0.1f'|format(node.metadata.size / 1000000) }} MB</td></tr>{% endif %}
+{% if node.hashes %}
+<tr><td class="k">Hashes</td><td class="v">
+  <ul>{% for algo, digest in node.hashes.items()|sort %}<li><code>{{ algo }}:{{ digest }}</code></li>{% endfor %}</ul>
+</td></tr>
+{% endif %}
+<tr><td class="k">Source(s)</td><td class="v">
+  <ul>{% for src in node.metadata.sources %}<li><code>{{ src }}</code></li>{% endfor %}</ul>
+  {% if not node.hashes %}<p class="hint">No source metadata yet has a
+  structured "manual acquisition" shape (see PLAN_V2_SITE.md) &mdash; this is
+  a raw representation for now.</p>{% endif %}
+</td></tr>
+</tbody>
+</table>
+
+{% if node.metadata.dua %}
+<h2>Data usage agreement</h2>
+<p class="warn">{{ node.metadata.dua }}</p>
+{% endif %}
+
+{{ m.triples_section(triples, node.qualified_name) }}
+{% endblock %}

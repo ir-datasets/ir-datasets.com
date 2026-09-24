@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}{{ node.qualified_name }} &mdash; ir-datasets.com{% endblock %}
+{% block content %}
+{{ m.node_header(node) }}
+
+<table class="meta-table">
+<tbody>
+<tr><td class="k">Entity</td><td class="v"><code>{{ node.entity }}</code></td></tr>
+{% set count = frozen_count(node) %}
+<tr><td class="k">Count</td><td class="v">
+  {{ count if count is not none else '— (not yet verified; run freeze --verify)' }}
+</td></tr>
+<tr><td class="k">Fields</td><td class="v">
+  {% for f in node.record_type._fields %}<code>{{ f }}</code>{% if not loop.last %}, {% endif %}{% endfor %}
+</td></tr>
+{% if node.metadata.lang %}<tr><td class="k">Language</td><td class="v"><code>{{ node.metadata.lang }}</code></td></tr>{% endif %}
+{% if node.metadata.defs %}
+<tr><td class="k">Relevance levels</td><td class="v">
+  <ul>{% for level, text in node.metadata.defs.items()|sort %}<li><code>{{ level }}</code>: {{ text }}</li>{% endfor %}</ul>
+</td></tr>
+{% endif %}
+</tbody>
+</table>
+
+{% if samples %}
+<h2>Sample records</h2>
+{% for idx, text in samples %}
+<p class="hint">record {{ idx }}</p>
+<pre class="code">{{ text }}</pre>
+{% endfor %}
+{% endif %}
+
+<h2>Try it</h2>
+<pre class="code">{{ snippet }}</pre>
+
+{{ m.triples_section(triples, node.qualified_name) }}
+{{ m.frozen_section(frozen) }}
+{% endblock %}

@@ -1,0 +1,4 @@
+flask>=3.0
+# ir_datasets (with the v2 prototype) is expected to be installed separately,
+# e.g. `pip install -e ../../ir-datasets` from a sibling checkout -- see
+# README.md.

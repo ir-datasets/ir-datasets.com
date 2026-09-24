@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}{{ node.qualified_name }} &mdash; ir-datasets.com{% endblock %}
+{% block content %}
+{{ m.node_header(node) }}
+
+<h2>Facets</h2>
+<table class="node-list">
+<thead><tr><th>Entity</th><th>Table</th><th>Count</th></tr></thead>
+<tbody>
+{% for entity in ['docs', 'queries', 'qrels', 'scoreddocs', 'docpairs'] %}
+{% set table = node.edge(entity) %}
+{% if table is not none %}
+{# NB: never `{% if table %}` -- Table defines __len__ (record count) but not
+   __bool__, so Python's truthiness protocol falls back to __len__(), and a
+   bare-object `if` here would materialize the table just to test presence. #}
+{% set count = frozen_count(table) %}
+<tr>
+  <td><code>{{ entity }}</code></td>
+  <td><a href="{{ node_url(table.qualified_name) }}"><code>{{ table.qualified_name }}</code></a></td>
+  <td>{{ count if count is not none else '—' }}</td>
+</tr>
+{% endif %}
+{% endfor %}
+</tbody>
+</table>
+<p class="hint">Counts shown only where <code>freeze --verify</code> has run for
+that table (&mdash; otherwise). This page never materializes a table itself.</p>
+
+{# A Benchmark itself has no derived_from EDGE -- see nodes.Benchmark.structural_edges's
+   own docstring: derivation is real at the Table level (a filtered queries/qrels
+   table's own derived_from edge), not one level up by convention. Showing
+   node.derived_from/node.filter here would describe a relationship with no
+   backing edge; that provenance is instead visible on the derived facet's own
+   page (follow a Facets link above), via a real edge. #}
+
+<h2>Try it</h2>
+<pre class="code">{{ snippet }}</pre>
+
+{{ m.triples_section(triples, node.qualified_name) }}
+{% endblock %}

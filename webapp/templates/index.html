@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}ir-datasets.com{% endblock %}
+{% block content %}
+<section class="hero">
+  <p><code>ir_datasets</code> provides a common interface to many IR ranking
+  datasets. This page is served live from a knowledge graph of named,
+  typed nodes &mdash; not pre-baked at build time, which is what lets
+  third-party packages register their own datasets without this site's
+  build ever having heard of them.</p>
+  <div class="search-box">
+    <input type="text" id="live-search" autocomplete="off"
+           placeholder="Search datasets, tables, benchmarks&hellip;" />
+    <div id="live-search-results" class="search-results" hidden></div>
+  </div>
+</section>
+
+<section>
+  <h2>Node types</h2>
+  <div class="stat-grid">
+    {% for type, label in type_labels.items() %}
+    <a class="stat-card" href="{{ url_for('browse', type=type) }}">
+      <div class="stat-count">{{ counts[type] }}</div>
+      <div class="stat-label">{{ label }}</div>
+      <code class="stat-type">{{ type }}</code>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+
+<section>
+  <h2>Providers</h2>
+  <p>Every node lives in a provider's namespace &mdash; there is no default
+  provider. Currently installed:</p>
+  <ul class="provider-list">
+    {% for prefix in providers %}
+    <li><a href="{{ url_for('provider', prefix=prefix) }}"><code>{{ prefix }}:</code></a></li>
+    {% endfor %}
+  </ul>
+  <p class="hint">Third-party providers register via the
+  <code>ir_datasets.providers</code> entry-point group &mdash; see
+  <code>PLAN_V2_SITE.md</code> for the registration flow this site will grow.</p>
+</section>
+
+<script>
+(function() {
+  var input = document.getElementById('live-search');
+  var results = document.getElementById('live-search-results');
+  var timer = null;
+  var controller = null;
+
+  function render(items) {
+    if (!items.length) {
+      results.innerHTML = '<div class="search-empty">No matches.</div>';
+      results.hidden = false;
+      return;
+    }
+    results.innerHTML = items.map(function(item) {
+      return '<a class="search-result" href="' + item.url + '">' +
+        '<code>' + item.name + '</code>' +
+        '<span class="search-result-type">' + item.type + '</span></a>';
+    }).join('');
+    results.hidden = false;
+  }
+
+  input.addEventListener('input', function() {
+    var q = input.value.trim();
+    clearTimeout(timer);
+    if (!q) {
+      results.hidden = true;
+      results.innerHTML = '';
+      return;
+    }
+    timer = setTimeout(function() {
+      if (controller) controller.abort();
+      controller = new AbortController();
+      fetch('/api/search?q=' + encodeURIComponent(q), {signal: controller.signal})
+        .then(function(r) { return r.json(); })
+        .then(render)
+        .catch(function(e) { if (e.name !== 'AbortError') throw e; });
+    }, 150);
+  });
+
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      window.location = '/browse?q=' + encodeURIComponent(input.value.trim());
+    } else if (e.key === 'Escape') {
+      results.hidden = true;
+    }
+  });
+
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.search-box')) {
+      results.hidden = true;
+    }
+  });
+})();
+</script>
+{% endblock %}

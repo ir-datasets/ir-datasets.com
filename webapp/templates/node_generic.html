@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}{{ node.qualified_name }} &mdash; ir-datasets.com{% endblock %}
+{% block content %}
+{{ m.node_header(node) }}
+<p class="hint">This node's type (<code>{{ node.type }}</code>) isn't one this
+site has a dedicated template for yet &mdash; likely a third-party provider's
+own vocabulary. Showing its raw metadata and edges instead.</p>
+
+<table class="meta-table">
+<tbody>
+{% for key, value in node.metadata.items()|sort %}
+<tr><td class="k">{{ key }}</td><td class="v">{{ value }}</td></tr>
+{% endfor %}
+</tbody>
+</table>
+
+{{ m.triples_section(triples, node.qualified_name) }}
+{{ m.frozen_section(frozen) }}
+{% endblock %}

@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}{{ node.qualified_name }} &mdash; ir-datasets.com{% endblock %}
+{% block content %}
+{{ m.node_header(node) }}
+
+<h2>Benchmarks in this suite</h2>
+<table class="node-list">
+<thead><tr><th>Name</th></tr></thead>
+<tbody>
+{% for subject, kind, object, other in triples if subject == node.qualified_name and kind == 'irds:benchmark' %}
+<tr><td><a href="{{ node_url(object) }}"><code>{{ object }}</code></a></td></tr>
+{% else %}
+<tr><td class="empty">No benchmarks in this suite.</td></tr>
+{% endfor %}
+</tbody>
+</table>
+
+{{ m.triples_section(triples, node.qualified_name) }}
+{% endblock %}
