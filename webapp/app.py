@@ -1,30 +1,33 @@
-"""A dynamic ir-datasets.com, built directly on ``ir_datasets.v2``.
+"""A dynamic ir-datasets.com, reading a materialized snapshot of the
+``ir_datasets.v2`` graph instead of walking its live Python objects.
 
-Unlike the static generator (``../generate.py``), this renders every page
-per-request from the live v2 graph. It's phase 4 of ``../PLAN_V2_SITE.md``:
-"Graph assembly from a single local manifest file + dataset/benchmark pages
-... No registry/fetcher yet -- one provider, manifest read from disk." In
-practice that means importing ``ir_datasets.v2`` directly (our own package is
-trusted; the trust-free manifest-only path is for *other* providers, added in
-a later phase) and querying its ``graph`` object -- ``Graph.edges_of``,
-``referrers``, ``dependents``, ``list`` -- which is exactly the traversal API
-this site needs, unmodified.
+Renders every page per-request, but the "assemble the graph" cost is paid
+once, ahead of time, by ``build_graph_db.py`` (into ``graph.db``, a
+pyoxigraph store) -- not on every request. That's what removes the two slow
+paths the live-graph version had: a home-page/`/browse` visit no longer
+triggers a live crawl of every ``ir-datasets``-tagged HuggingFace repo
+(``discover=True``), and a node page no longer risks importing a Python
+module just to answer "does this exist". See ``graph_queries.py`` for the
+read path and ``rdf_schema.py`` for the RDF mapping ``build_graph_db.py``
+writes and this reads back.
 
-Content today: ANTIQUE, the full BEIR suite (14 headline benchmarks + a
-separate CQADupStack sub-suite), and NanoBEIR -- still a small slice of the
-real catalog, since each family is hand-ported. The v1->v2 manifest exporter
-(plan phase 3) is what gives this the full catalog without waiting on a
-hand-port of every dataset.
+A node not in the store at all (freshest hf: repos the last snapshot missed)
+falls back to a live ``ir_datasets.v2`` resolution -- see ``node()`` -- so
+browsing an arbitrary hf repo still works, just not from the fast path.
 
 Run:
     pip install -r requirements.txt
+    python build_graph_db.py      # once, or whenever you want a fresh snapshot
     python app.py                 # http://127.0.0.1:5000
 """
-import json
+import re
 import sys
 from pathlib import Path
 
+import pyoxigraph as ox
 from flask import Flask, abort, jsonify, render_template, request, url_for
+
+import graph_queries as gq
 
 try:
     import ir_datasets.v2 as v2
@@ -38,9 +41,26 @@ except ImportError:
 
 app = Flask(__name__)
 
-#: Every node type this site knows how to render specially. A type not in
-#: here (a future third-party provider's own vocabulary) still gets a page --
-#: see node_generic.html -- just a plainer one.
+STORE_PATH = Path(__file__).resolve().parent / 'graph.db'
+try:
+    store = ox.Store.read_only(str(STORE_PATH))
+except OSError:
+    # No build_graph_db.py run yet, or an older pyoxigraph without
+    # read_only() -- either way, fall back to a plain (still never written
+    # to at request time) store so the app can at least start.
+    store = ox.Store(str(STORE_PATH))
+gq.warm(store)
+
+#: The top-level node categories this site knows how to render specially --
+#: used for the home page's stat cards and the browse page's type filter.
+#: ``irds:Table`` is itself a real (registerable) type, but every concrete
+#: table node in the catalog is actually one of its five subtypes
+#: (``irds:DocTable``, ``irds:QrelTable``, ...) -- see ``ir_datasets.v2.nodes``'s
+#: ``TABLE_TYPES``. Grouping by category below is therefore always done via
+#: ``graph_queries``'s stored ``subClassOf`` closure, never exact-``==``
+#: against a node's own (more specific) type. A type not in here at all (a
+#: future third-party provider's own vocabulary with no matching parent)
+#: still gets a page -- see node_generic.html -- just a plainer one.
 TYPE_LABELS = {
     v2.RESOURCE: 'Resource',
     v2.TABLE: 'Table',
@@ -65,31 +85,108 @@ TEMPLATE_BY_TYPE = {
     v2.SUITE: 'node_suite.html',
 }
 
+#: One custom color per top-level category (a specific brand palette, not
+#: one of Tabler's named colors), used everywhere a type shows up with its
+#: own color: a badge (a node page's header, /search's and
+#: /provider/<prefix>'s result rows) or the home page's stat cards -- never
+#: blue, since that's already the site's link color and a blue badge next to
+#: a blue link reads as one blurred-together thing. Maps to a `cat-<slug>`
+#: CSS class family defined in static/style.css (Tabler has no utility
+#: classes for arbitrary hex colors).
+TYPE_COLOR_SLUGS = {
+    v2.RESOURCE: 'resource',
+    v2.TABLE: 'table',
+    v2.BENCHMARK: 'benchmark',
+    v2.SUITE: 'suite',
+}
+#: An unrecognized (future third-party) type still gets a color, just a
+#: neutral one -- see _category_of.
+DEFAULT_COLOR_SLUG = 'default'
 
-def _counts_by_type():
-    counts = {t: 0 for t in TYPE_LABELS}
-    for name in v2.list_datasets(discover=True):
-        t = v2.graph.type_of(name)
-        if t in counts:
-            counts[t] += 1
-    return counts
+_SCHEMA_FIELDS_RE = re.compile(r'\(([^)]*)\)')
+
+#: Default/max chunk size for /api/browse's infinite scroll -- CLIRMatrix
+#: alone contributes ~155k enumerated names to the catalog; sending (or
+#: rendering) an unpaginated listing is a multi-ten-megabyte response, so
+#: every listing is chunked, never all-at-once, however large the catalog
+#: gets. Default is generous ("more things displayed by default") since a
+#: JSON chunk this size is still fast; MAX bounds a crafted ?limit=.
+PAGE_SIZE = 200
+MAX_PAGE_SIZE = 1000
+
+#: Provider-filter checkboxes default to every available provider-graph
+#: (see rdf_schema.graph_for) EXCEPT this one -- CLIRMatrix alone is ~620k of
+#: the ~623k nodes in the catalog, so showing it by default would swamp
+#: every other, much smaller family a first-time visitor is more likely to
+#: actually want.
+DEFAULT_HIDDEN_PROVIDERS = {'clirmatrix'}
+
+
+def _selected_providers(scope=None):
+    """The enabled provider-graphs for this request: the ``providers=``
+    query param (comma-separated; may be empty, meaning none selected) if
+    given at all, else a default. Distinguishing "not given" from "given but
+    empty" is why this checks ``request.args`` for the key at all rather than
+    just defaulting a falsy value -- a user unchecking every box is a real,
+    distinct state from a fresh page load.
+
+    ``scope``, when given, means "this is one provider's own page" (e.g.
+    /provider/clirmatrix's listing) rather than the global, cross-provider
+    one (the home page): it restricts which graphs even count as
+    "available", and -- since visiting a provider's own page is itself an
+    explicit request to see it -- its default is that whole scope, not
+    ``DEFAULT_HIDDEN_PROVIDERS`` (which exists only to keep CLIRMatrix from
+    swamping the *global* listing by default)."""
+    available = gq.available_providers(store)
+    if scope is not None:
+        available = [p for p in available if p in scope]
+    if 'providers' not in request.args:
+        if scope is not None:
+            return available
+        return [p for p in available if p not in DEFAULT_HIDDEN_PROVIDERS]
+    raw = request.args.get('providers') or ''
+    selected = {p for p in raw.split(',') if p}
+    return [p for p in available if p in selected]
+
+
+def _category_of(t):
+    """Which of the four top-level categories (``TYPE_LABELS``' keys) a
+    node's own type falls under -- ``None`` if it isn't a (transitive)
+    subtype of any of them (an unknown third-party type)."""
+    for category in TYPE_LABELS:
+        if v2.is_subtype(t, category):
+            return category
+    return None
+
+
+def _type_color(t):
+    """The ``cat-<slug>`` color slug for a type -- see TYPE_COLOR_SLUGS. Used
+    to build a badge's ``badge-cat-*`` class and, on the home page, a stat
+    card's ``text-cat-*``/``border-cat-*`` classes (all defined in
+    static/style.css)."""
+    return TYPE_COLOR_SLUGS.get(_category_of(t), DEFAULT_COLOR_SLUG)
+
+
+def _type_badge_class(t):
+    """The ``badge-cat-*`` class for a type's badge -- see _type_color."""
+    return f'badge-cat-{_type_color(t)}'
 
 
 def _frozen_count(table):
-    """A table's record count, from the frozen manifest ONLY.
+    """A table's record count, from the frozen row ONLY.
 
     Deliberately never falls back to ``Table.count()`` -- for an unverified
-    node (no ``freeze --verify`` run yet, which is most of the catalog before
-    that CI job exists) that can fall through to actually building a
-    docstore, which for something like BEIR's msmarco means downloading a
-    1GB+ zip on page render. A page must never trigger that as a side effect
-    of being viewed.
+    node (no ``freeze --verify`` run yet) that can fall through to actually
+    building a docstore, which for something like BEIR's msmarco means
+    downloading a 1GB+ zip on page render. A page must never trigger that as
+    a side effect of being viewed.
     """
     return table._frozen().get('count')
 
 
 def _pretty_samples(frozen):
     """Frozen sample rows are canonical JSON *strings*; re-parse for display."""
+    import json
     out = []
     for idx, line in sorted(frozen.get('samples', {}).items(), key=lambda kv: int(kv[0])):
         try:
@@ -99,12 +196,24 @@ def _pretty_samples(frozen):
     return out
 
 
+def _record_fields(frozen):
+    """A table's field names, from its frozen ``record_schema`` string (e.g.
+    ``"GenericDoc(doc_id, text)"``) -- never from a live ``record_type``,
+    which for some providers (hf) means building a handler / peeking a
+    dataset's real columns just to answer "what are the field names"."""
+    schema = frozen.get('record_schema')
+    if not schema:
+        return None
+    m = _SCHEMA_FIELDS_RE.search(schema)
+    return [f.strip() for f in m.group(1).split(',')] if m else None
+
+
 def _python_snippet(node):
     """A minimal, accurate usage example -- only what the library actually
     supports today (no CLI/PyTerrier/XPM-IR generators yet; see
     ../PLAN_V2_SITE.md's reuse table)."""
     name = node.qualified_name
-    if node.type == v2.BENCHMARK:
+    if v2.is_subtype(node.type, v2.BENCHMARK):
         singular = {'docs': 'doc', 'queries': 'query', 'qrels': 'qrel',
                     'scoreddocs': 'scoreddoc', 'docpairs': 'docpair'}
         lines = ["import ir_datasets.v2", f"ds = ir_datasets.v2.load({name!r})"]
@@ -112,11 +221,12 @@ def _python_snippet(node):
             table = node.edge(entity)
             if table is None:
                 continue
-            fields = ', '.join(table.record_type._fields)
+            fields = _record_fields(table._frozen())
             lines.append(f"for {singular[entity]} in ds.{entity}:")
-            lines.append(f"    ...  # {singular[entity]}.[{fields}]")
+            comment = f"  # {singular[entity]}.[{', '.join(fields)}]" if fields else ''
+            lines.append(f"    ...{comment}")
         return '\n'.join(lines)
-    if node.type == v2.TABLE:
+    if v2.is_subtype(node.type, v2.TABLE):
         return (f"import ir_datasets.v2\n"
                 f"table = ir_datasets.v2.load({name!r})\n"
                 f"len(table)             # record count\n"
@@ -125,130 +235,157 @@ def _python_snippet(node):
     return f"import ir_datasets.v2\nnode = ir_datasets.v2.load({name!r})"
 
 
-def _triples_of(name):
-    """Every triple involving `name`, either as subject or object: ``(subject,
-    kind, object, other)`` where `other` is whichever end isn't `name`, for
-    linking. Merges what used to be two separate sections (outgoing "Edges"
-    and incoming "Referenced by") into one table, since both are just triples
-    from `name`'s point of view."""
-    rows = []
-    for kind, targets in v2.graph.edges_of(name).items():
-        for target in targets:
-            rows.append((name, kind, target, target))
-    for subject, kind in v2.graph.incoming_edges(name):
-        rows.append((subject, kind, name, subject))
-    rows.sort(key=lambda r: (r[1], r[3]))
-    return rows
-
-
-def _search_names(query, limit=20):
-    """Names containing `query`, cheapest match first (earliest in the name,
-    then shortest name) -- substring, case-insensitive, same rule ``/browse``
-    filters by. ``discover=False``: a live-search box firing on every
-    keystroke can't afford hf's live Hub lookup on each one."""
-    query = query.lower()
-    names = [n for n in v2.list_datasets(discover=False) if query in n.lower()]
-    names.sort(key=lambda n: (n.lower().index(query), len(n)))
-    return names[:limit]
-
-
 def _node_url(name):
     """A link to a node by qualified name -- resolvable whether or not it's
-    been registered/imported yet (the route resolves lazily on request)."""
+    in the materialized store (the route falls back to a live resolution)."""
     return url_for('node', qualified=name)
 
 
 def _type_label(t):
     if t is None:
-        # A discover=True/known_names() entry: known to exist, not yet
-        # resolved, so its type isn't known without resolving it.
         return 'unresolved'
-    return TYPE_LABELS.get(t, t)
+    if t in TYPE_LABELS:
+        return TYPE_LABELS[t]
+    # A more specific type than the four categories above (e.g.
+    # ``irds:QrelTable``, or a third-party ``ext:MyTable``) -- its own bare
+    # name is already a readable label (types are named like their Python
+    # class), so strip the provider prefix rather than showing the raw
+    # qualified string or collapsing it to its category's generic label.
+    return t.split(':', 1)[-1]
 
 
 def _node_exists(name):
-    """Whether a (colon-containing) string actually resolves in the graph --
-    e.g. a Benchmark's ``citation`` is plain text today (see PLAN_V2_SITE.md's
-    "Deferred to a later paper"), often a DBLP key with a colon in it, but not
-    a graph node; don't link it as if it were one."""
-    try:
-        return name in v2.graph
-    except KeyError:
-        return False
+    """Whether a (colon-containing) string actually resolves to a node --
+    e.g. a Benchmark's ``citation`` is plain text today, often a DBLP key
+    with a colon in it, but not a graph node; don't link it as if it were
+    one."""
+    return gq.node_exists(store, name)
 
 
 app.jinja_env.globals['node_url'] = _node_url
 app.jinja_env.globals['node_exists'] = _node_exists
 app.jinja_env.globals['type_label'] = _type_label
+app.jinja_env.globals['type_badge_class'] = _type_badge_class
+app.jinja_env.globals['type_color'] = _type_color
 app.jinja_env.globals['provider_of'] = lambda name: name.split(':', 1)[0]
 app.jinja_env.globals['frozen_count'] = _frozen_count
 
 
 @app.route('/')
 def index():
+    """A quiet landing page -- stat cards + provider list only, no filter
+    bar and no results list (see search()). Clicking a stat card links to
+    /search with that type pre-filtered; typing into the navbar search box
+    fake-navigates there too (see static/nav.js). Stat-card counts respect
+    the provider-filter default (everything except CLIRMatrix -- there are
+    no checkboxes here to override it, unlike /search)."""
+    counts = gq.counts_by_type(store, list(TYPE_LABELS), providers=_selected_providers())
     return render_template(
-        'index.html', counts=_counts_by_type(),
+        'index.html', counts=counts, has_sidebar=False,
         providers=sorted(v2.graph.providers), type_labels=TYPE_LABELS_PLURAL)
 
 
-@app.route('/api/search')
-def api_search():
-    """JSON backing the home page's live search box. Cheap and synchronous
-    (no ``discover``), so it's safe to call on every keystroke."""
-    query = (request.args.get('q') or '').strip()
-    if not query:
-        return jsonify([])
-    return jsonify([
-        {'name': name, 'type': _type_label(v2.graph.type_of(name)), 'url': _node_url(name)}
-        for name in _search_names(query)
-    ])
-
-
-@app.route('/browse')
-def browse():
-    type_filter = request.args.get('type') or None
-    query = (request.args.get('q') or '').strip().lower()
-    # discover=True also asks dynamic providers (e.g. hf) for their known-but-
-    # unresolved names -- a live lookup, so it only applies when there's no
-    # type filter (an unresolved name's type isn't known without resolving it).
-    names = v2.list_datasets(type=type_filter, discover=type_filter is None)
-    if query:
-        names = [n for n in names if query in n.lower()]
-    rows = [(name, v2.graph.type_of(name)) for name in names]
+@app.route('/search')
+def search():
+    """The filterable, infinite-scrolling catalog listing (see
+    static/browse.js) -- reached by typing into the navbar search box from
+    anywhere (a fake, history-API navigation -- see static/nav.js) or by a
+    real link (a stat card, a provider page). Unlike the home page, this one
+    has the Type/Provider filter sidebar."""
+    selected = _selected_providers()
     return render_template(
-        'browse.html', rows=rows, type_labels=TYPE_LABELS,
-        type_filter=type_filter, query=query)
+        'search.html', has_sidebar=True,
+        type_filter_labels=TYPE_LABELS,
+        type_filter=request.args.get('type') or '',
+        query=request.args.get('q') or '',
+        available_providers=gq.available_providers(store),
+        selected_providers=selected)
+
+
+@app.route('/api/browse')
+def api_browse():
+    """JSON backing both the home page's and /provider/<prefix>'s live,
+    infinite-scrolling listings -- one endpoint, one query shape (``q``/
+    ``type``/``name_prefix``/``providers``/``offset``/``limit``), so there is
+    exactly one place that knows how to page through a catalog CLIRMatrix
+    alone has made ~620k rows large. ``limit`` is capped, not just defaulted,
+    so a crafted request can't force one huge response. ``providers``
+    (comma-separated) follows ``_selected_providers``'s own "key absent ->
+    default" rule -- but when a ``prefix`` (a provider page's own listing) is
+    given and ``providers`` isn't, the default scopes to that one provider
+    rather than the global "everything except CLIRMatrix" default, so
+    /provider/clirmatrix's own page isn't empty by default just because
+    CLIRMatrix is hidden everywhere else."""
+    query = (request.args.get('q') or '').strip() or None
+    type_filter = request.args.get('type') or None
+    name_prefix = request.args.get('prefix') or None
+    try:
+        offset = max(0, int(request.args.get('offset', 0)))
+    except ValueError:
+        offset = 0
+    try:
+        limit = min(MAX_PAGE_SIZE, max(1, int(request.args.get('limit', PAGE_SIZE))))
+    except ValueError:
+        limit = PAGE_SIZE
+    scope = {name_prefix.rstrip(':')} if name_prefix else None
+    rows, total = gq.list_nodes(store, type_filter=type_filter, query=query,
+                                name_prefix=name_prefix, providers=_selected_providers(scope=scope),
+                                limit=limit, offset=offset)
+    return jsonify({
+        'rows': [{'name': name, 'type_label': _type_label(type_), 'type': type_,
+                 'badge_class': _type_badge_class(type_),
+                 'url': _node_url(name), 'provider': name.split(':', 1)[0],
+                 'provider_url': url_for('provider', prefix=name.split(':', 1)[0])}
+                for name, type_ in rows],
+        'total': total, 'offset': offset, 'limit': limit,
+    })
+
+
+@app.route('/api/counts')
+def api_counts():
+    """JSON stat-card counts for the current provider-filter selection (see
+    ``_selected_providers``) -- fetched by the home/browse page's checkboxes
+    on every change, so the stat cards never show a stale total for a
+    provider selection the listing below them no longer matches."""
+    counts = gq.counts_by_type(store, list(TYPE_LABELS), providers=_selected_providers())
+    return jsonify({t: counts[t] for t in TYPE_LABELS})
 
 
 @app.route('/provider/<prefix>')
 def provider(prefix):
+    """No provider-filter checkboxes here (unlike the home page) -- each
+    provider is now its own graph (see rdf_schema.py), so this page's own
+    listing (via /api/browse's ``prefix=`` scoping) always shows exactly
+    this provider's nodes regardless of the home page's global default."""
     p = v2.graph.providers.get(prefix)
     if p is None:
         abort(404, f'no provider registered under prefix {prefix!r} (installed: '
                     f'{", ".join(sorted(v2.graph.providers)) or "none"})')
     manifest = p.manifest()
-    # known_names() adds a dynamic provider's (e.g. hf's) known-but-unresolved
-    # names -- a live lookup; its entries have no type yet (see type_of below)
-    # since resolving each one just to list it would defeat the point.
-    rows = [(name, p.type_of(name)) for name in sorted(p.names() | p.known_names())]
     return render_template(
-        'provider.html', provider=p, prefix=prefix, rows=rows,
-        manifest=manifest, type_labels=TYPE_LABELS)
+        'provider.html', provider=p, prefix=prefix, manifest=manifest,
+        type_labels=TYPE_LABELS)
 
 
 @app.route('/n/<path:qualified>')
 def node(qualified):
-    try:
-        n = v2.graph[qualified]
-    except KeyError as e:
-        abort(404, str(e))
-    template = TEMPLATE_BY_TYPE.get(n.type, 'node_generic.html')
+    n = gq.node_data(store, qualified)
+    triples = gq.triples_of(store, qualified) if n is not None else []
+    if n is None:
+        # Not in the materialized snapshot (most likely a fresh hf: repo the
+        # last build's crawl missed, or predates it) -- resolve it live, same
+        # as the fully-dynamic version of this app always did.
+        try:
+            n = v2.graph[qualified]
+        except KeyError as e:
+            abort(404, str(e))
+    category = _category_of(n.type)
+    template = TEMPLATE_BY_TYPE.get(category, 'node_generic.html')
     frozen = n._frozen()
-    triples = _triples_of(n.qualified_name)
     return render_template(
         template, node=n, frozen=frozen, triples=triples,
         type_labels=TYPE_LABELS, samples=_pretty_samples(frozen),
-        snippet=_python_snippet(n))
+        snippet=_python_snippet(n), record_fields=_record_fields(frozen))
 
 
 @app.errorhandler(404)

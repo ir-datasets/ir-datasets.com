@@ -4,24 +4,47 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>{% block title %}ir-datasets.com{% endblock %}</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1/dist/css/tabler.min.css" />
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
 </head>
 <body>
-<header>
-  <a class="brand" href="{{ url_for('index') }}">ir-datasets<span class="dim">.com</span></a>
-  <nav>
-    <a href="{{ url_for('index') }}">Home</a>
-    <a href="{{ url_for('browse') }}">Browse</a>
-    <a href="https://github.com/ir-datasets/ir-datasets" target="_blank" rel="noopener">GitHub</a>
-  </nav>
-</header>
-<main>
-{% block content %}{% endblock %}
-</main>
-<footer>
-  <p>Prototype dynamic site, built on <code>ir_datasets.v2</code> &mdash;
-  phase 4 of <code>PLAN_V2_SITE.md</code>. Only datasets ported to v2 so far
-  appear here (currently: ANTIQUE).</p>
-</footer>
+<div class="page">
+  <header class="navbar navbar-expand-md navbar-dark bg-dark d-print-none">
+    <div class="container-xl">
+      <h1 class="navbar-brand pe-0 pe-md-3">
+        <a href="{{ url_for('index') }}" class="text-white text-decoration-none">ir-datasets<span style="color: #999;">.com</span></a>
+      </h1>
+      <div class="navbar-nav flex-row order-md-last flex-fill">
+        <div class="nav-item flex-fill">
+          {% block navbar_search %}
+          <form onsubmit="return false" autocomplete="off" class="navbar-search">
+            <input type="search" data-browse-search data-nav-search value="{{ query|default('') }}" class="form-control"
+                   placeholder="Search datasets, tables, benchmarks&hellip;" />
+          </form>
+          {% endblock %}
+        </div>
+      </div>
+    </div>
+  </header>
+  <div class="page-wrapper">
+    <div class="page-body">
+      <div class="container-xl">
+        {% set has_sidebar = has_sidebar|default(false) %}
+        <div class="row row-cards" data-page-row>
+          {% if has_sidebar %}
+          <div class="col-12 col-lg-3">{% block sidebar %}{% endblock %}</div>
+          {% endif %}
+          <div class="col-12 {{ 'col-lg-9' if has_sidebar else '' }}">
+            {% block content %}{% endblock %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@tabler/core@1/dist/js/tabler.min.js"></script>
+<script src="{{ url_for('static', filename='browse.js') }}"></script>
+<script src="{{ url_for('static', filename='nav.js') }}"></script>
+{% block scripts %}{% endblock %}
 </body>
 </html>

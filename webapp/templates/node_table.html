@@ -4,35 +4,46 @@
 {% block content %}
 {{ m.node_header(node) }}
 
-<table class="meta-table">
-<tbody>
-<tr><td class="k">Entity</td><td class="v"><code>{{ node.entity }}</code></td></tr>
-{% set count = frozen_count(node) %}
-<tr><td class="k">Count</td><td class="v">
-  {{ count if count is not none else '— (not yet verified; run freeze --verify)' }}
-</td></tr>
-<tr><td class="k">Fields</td><td class="v">
-  {% for f in node.record_type._fields %}<code>{{ f }}</code>{% if not loop.last %}, {% endif %}{% endfor %}
-</td></tr>
-{% if node.metadata.lang %}<tr><td class="k">Language</td><td class="v"><code>{{ node.metadata.lang }}</code></td></tr>{% endif %}
-{% if node.metadata.defs %}
-<tr><td class="k">Relevance levels</td><td class="v">
-  <ul>{% for level, text in node.metadata.defs.items()|sort %}<li><code>{{ level }}</code>: {{ text }}</li>{% endfor %}</ul>
-</td></tr>
-{% endif %}
-</tbody>
-</table>
+<div class="card">
+  <div class="table-responsive">
+  <table class="table table-vcenter card-table">
+  <tbody>
+  <tr><td class="text-secondary w-1">Entity</td><td><code>{{ node.entity }}</code></td></tr>
+  {% set count = frozen_count(node) %}
+  <tr><td class="text-secondary w-1">Count</td><td>
+    {{ count if count is not none else '— (not yet verified; run freeze --verify)' }}
+  </td></tr>
+  <tr><td class="text-secondary w-1">Fields</td><td>
+    {% if record_fields %}{% for f in record_fields %}<code>{{ f }}</code>{% if not loop.last %}, {% endif %}{% endfor %}
+    {% else %}&mdash; (not yet verified; run freeze --verify){% endif %}
+  </td></tr>
+  {% if node.metadata.lang %}<tr><td class="text-secondary w-1">Language</td><td><code>{{ node.metadata.lang }}</code></td></tr>{% endif %}
+  {% if node.metadata.defs %}
+  <tr><td class="text-secondary w-1">Relevance levels</td><td>
+    <ul class="mb-0">{% for level, text in node.metadata.defs.items()|sort %}<li><code>{{ level }}</code>: {{ text }}</li>{% endfor %}</ul>
+  </td></tr>
+  {% endif %}
+  </tbody>
+  </table>
+  </div>
+</div>
 
 {% if samples %}
-<h2>Sample records</h2>
-{% for idx, text in samples %}
-<p class="hint">record {{ idx }}</p>
-<pre class="code">{{ text }}</pre>
-{% endfor %}
+<div class="card mt-3">
+  <div class="card-header"><h3 class="card-title">Sample records</h3></div>
+  <div class="card-body">
+  {% for idx, text in samples %}
+  <p class="text-secondary mb-1">record {{ idx }}</p>
+  <pre class="bg-dark-lt rounded p-3 overflow-auto">{{ text }}</pre>
+  {% endfor %}
+  </div>
+</div>
 {% endif %}
 
-<h2>Try it</h2>
-<pre class="code">{{ snippet }}</pre>
+<div class="card mt-3">
+  <div class="card-header"><h3 class="card-title">Try it</h3></div>
+  <div class="card-body"><pre class="bg-dark-lt rounded p-3 overflow-auto mb-0">{{ snippet }}</pre></div>
+</div>
 
 {{ m.triples_section(triples, node.qualified_name) }}
 {{ m.frozen_section(frozen) }}

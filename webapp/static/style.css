@@ -1,210 +1,48 @@
-:root {
-  --bg: #ffffff;
-  --fg: #1a1a1a;
-  --dim: #6b7280;
-  --border: #e5e7eb;
-  --accent: #1d4ed8;
-  --accent-bg: #eff6ff;
-  --code-bg: #f6f8fa;
-  --warn-bg: #fff7ed;
-  --warn-border: #fdba74;
-  font-size: 15px;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0f1115;
-    --fg: #e5e7eb;
-    --dim: #9ca3af;
-    --border: #2a2e37;
-    --accent: #60a5fa;
-    --accent-bg: #111a2e;
-    --code-bg: #171a21;
-    --warn-bg: #241a10;
-    --warn-border: #92400e;
-  }
-}
-
-* { box-sizing: border-box; }
-
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--fg);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  line-height: 1.55;
-}
-
-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.9em 1.5em;
-  border-bottom: 1px solid var(--border);
-  position: sticky;
-  top: 0;
-  background: var(--bg);
-  z-index: 1;
-}
-
-.brand { font-weight: 700; font-size: 1.1em; color: var(--fg); text-decoration: none; }
-.brand .dim { color: var(--dim); font-weight: 400; }
-
-nav a { color: var(--dim); text-decoration: none; margin-left: 1.4em; font-size: 0.95em; }
-nav a:hover { color: var(--accent); }
-
-main { max-width: 900px; margin: 0 auto; padding: 2em 1.5em 4em; }
-
-footer {
-  border-top: 1px solid var(--border);
-  padding: 1.2em 1.5em;
-  color: var(--dim);
-  font-size: 0.85em;
-  max-width: 900px;
-  margin: 0 auto;
-}
-
-h1 { font-size: 1.6em; margin: 0.3em 0 0.6em; word-break: break-word; }
-h2 { font-size: 1.15em; margin-top: 2em; border-bottom: 1px solid var(--border); padding-bottom: 0.3em; }
-
-a { color: var(--accent); }
+/* App-specific tweaks layered on top of Tabler (base.html loads it from the
+   CDN) -- everything else (layout, navbar, cards, tables, forms, dark mode)
+   is Tabler's own. */
 
 code {
+  --tblr-code-bg: transparent;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  padding: 0.05em 0.4em;
-  font-size: 0.92em;
+  padding: 0;
 }
 
-code.self {
-  color: #888;
+[data-browse-sentinel] { height: 1px; }
+
+/* Tabler's badge-sm vertically centers its text a little high (no
+   descender room) -- nudge it down so it looks balanced next to a node
+   name's baseline (search/provider rows, a node page's header). */
+.badge.badge-sm { padding-bottom: 3px; }
+
+/* One color per top-level node category (Resource/Table/Benchmark/Suite) --
+   a custom palette, not one of Tabler's named colors, so it's defined here
+   rather than via Tabler's bg, text and border color utilities. Used for a
+   type's badge (node pages, /search, /provider/<prefix>) and the home page's
+   stat cards -- see app.py's TYPE_COLOR_SLUGS/_type_color. "default" covers
+   an unrecognized (future third-party) type. */
+:root {
+  --cat-resource: #8D6300;
+  --cat-table: #00786B;
+  --cat-benchmark: #C7303C;
+  --cat-suite: #925977;
+  --cat-default: #667382;
 }
 
-pre.code {
-  background: var(--code-bg);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 1em;
-  overflow-x: auto;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.9em;
-}
+.text-cat-resource { color: var(--cat-resource) !important; }
+.text-cat-table { color: var(--cat-table) !important; }
+.text-cat-benchmark { color: var(--cat-benchmark) !important; }
+.text-cat-suite { color: var(--cat-suite) !important; }
+.text-cat-default { color: var(--cat-default) !important; }
 
-.desc { margin: 0.5em 0; }
-.hint { color: var(--dim); font-size: 0.9em; }
-.dim { color: var(--dim); }
+.border-cat-resource { border-color: var(--cat-resource) !important; }
+.border-cat-table { border-color: var(--cat-table) !important; }
+.border-cat-benchmark { border-color: var(--cat-benchmark) !important; }
+.border-cat-suite { border-color: var(--cat-suite) !important; }
+.border-cat-default { border-color: var(--cat-default) !important; }
 
-.warn {
-  background: var(--warn-bg);
-  border: 1px solid var(--warn-border);
-  border-radius: 6px;
-  padding: 0.7em 1em;
-  margin: 0.8em 0;
-}
-
-.citation, .metrics { font-size: 0.92em; color: var(--dim); }
-
-.breadcrumb { display: flex; align-items: center; gap: 0.6em; font-size: 0.9em; }
-.breadcrumb a { text-decoration: none; color: var(--dim); }
-.type-badge {
-  background: var(--accent-bg);
-  color: var(--accent);
-  border-radius: 999px;
-  padding: 0.1em 0.7em;
-  font-size: 0.8em;
-  font-weight: 600;
-}
-
-table.node-list, table.meta-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 0.6em 0;
-}
-table.node-list th, table.node-list td,
-table.meta-table td {
-  text-align: left;
-  padding: 0.45em 0.6em;
-  border-bottom: 1px solid var(--border);
-  vertical-align: top;
-}
-table.node-list th { color: var(--dim); font-weight: 600; font-size: 0.85em; }
-table.node-list th:not(:last-child), table.node-list td:not(:last-child) {
-  width: 1%;
-  white-space: nowrap;
-}
-table.meta-table td.k { width: 220px; color: var(--dim); }
-td.empty { color: var(--dim); font-style: italic; }
-
-.stat-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 0.8em;
-  margin: 1em 0;
-}
-.stat-card {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 1em;
-  text-decoration: none;
-  color: var(--fg);
-  display: block;
-}
-.stat-card:hover { border-color: var(--accent); }
-.stat-count { font-size: 1.8em; font-weight: 700; }
-.stat-label { color: var(--dim); font-size: 0.9em; }
-.stat-type { font-size: 0.75em; color: var(--dim); }
-
-.provider-list { list-style: none; padding: 0; }
-.provider-list li { margin: 0.3em 0; }
-
-.filters { display: flex; gap: 0.6em; align-items: center; flex-wrap: wrap; margin: 1em 0; }
-.filters input[type=text] { padding: 0.4em 0.6em; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--fg); }
-.filters select { padding: 0.4em; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--fg); }
-.filters button { padding: 0.4em 1em; border: 1px solid var(--accent); border-radius: 6px; background: var(--accent-bg); color: var(--accent); cursor: pointer; }
-.filters label { font-size: 0.9em; color: var(--dim); }
-
-.meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6em 2em; margin: 1em 0; }
-.meta-grid > div { border-bottom: 1px solid var(--border); padding-bottom: 0.4em; }
-.meta-grid .k { display: block; color: var(--dim); font-size: 0.8em; }
-.meta-grid .v { display: block; }
-
-.search-box { position: relative; margin-top: 1.2em; max-width: 480px; }
-.search-box input[type=text] {
-  width: 100%;
-  padding: 0.6em 0.8em;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg);
-  color: var(--fg);
-  font-size: 1em;
-}
-.search-box input[type=text]:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-.search-results {
-  position: absolute;
-  top: calc(100% + 0.3em);
-  left: 0;
-  right: 0;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  max-height: 320px;
-  overflow-y: auto;
-  z-index: 2;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-}
-.search-result {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.6em;
-  padding: 0.5em 0.8em;
-  text-decoration: none;
-  color: var(--fg);
-  border-bottom: 1px solid var(--border);
-}
-.search-result:last-child { border-bottom: none; }
-.search-result:hover { background: var(--accent-bg); }
-.search-result-type { font-size: 0.78em; color: var(--dim); white-space: nowrap; }
-.search-empty { padding: 0.6em 0.8em; color: var(--dim); font-size: 0.9em; }
+.badge-cat-resource, a.badge-cat-resource { background: var(--cat-resource); color: #fff; }
+.badge-cat-table, a.badge-cat-table { background: var(--cat-table); color: #fff; }
+.badge-cat-benchmark, a.badge-cat-benchmark { background: var(--cat-benchmark); color: #fff; }
+.badge-cat-suite, a.badge-cat-suite { background: var(--cat-suite); color: #fff; }
+.badge-cat-default, a.badge-cat-default { background: var(--cat-default); color: #fff; }

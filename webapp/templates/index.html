@@ -1,98 +1,33 @@
 {% extends "base.html" %}
 {% block title %}ir-datasets.com{% endblock %}
+
 {% block content %}
-<section class="hero">
-  <p><code>ir_datasets</code> provides a common interface to many IR ranking
-  datasets. This page is served live from a knowledge graph of named,
-  typed nodes &mdash; not pre-baked at build time, which is what lets
-  third-party packages register their own datasets without this site's
-  build ever having heard of them.</p>
-  <div class="search-box">
-    <input type="text" id="live-search" autocomplete="off"
-           placeholder="Search datasets, tables, benchmarks&hellip;" />
-    <div id="live-search-results" class="search-results" hidden></div>
-  </div>
-</section>
-
-<section>
-  <h2>Node types</h2>
-  <div class="stat-grid">
-    {% for type, label in type_labels.items() %}
-    <a class="stat-card" href="{{ url_for('browse', type=type) }}">
-      <div class="stat-count">{{ counts[type] }}</div>
-      <div class="stat-label">{{ label }}</div>
-      <code class="stat-type">{{ type }}</code>
+<div class="row row-cards mb-3">
+  {% for type, label in type_labels.items() %}
+  <div class="col-6 col-lg-3">
+    <a class="card card-link border-top border-3 border-cat-{{ type_color(type) }}" href="{{ url_for('search', type=type) }}">
+      <div class="card-body text-center">
+        <div class="h1 mb-0 text-cat-{{ type_color(type) }}">{{ counts[type] }}</div>
+        <div class="text-cat-{{ type_color(type) }}">{{ label }}</div>
+      </div>
     </a>
-    {% endfor %}
   </div>
-</section>
+  {% endfor %}
+</div>
 
-<section>
-  <h2>Providers</h2>
-  <p>Every node lives in a provider's namespace &mdash; there is no default
-  provider. Currently installed:</p>
-  <ul class="provider-list">
-    {% for prefix in providers %}
-    <li><a href="{{ url_for('provider', prefix=prefix) }}"><code>{{ prefix }}:</code></a></li>
-    {% endfor %}
-  </ul>
-  <p class="hint">Third-party providers register via the
-  <code>ir_datasets.providers</code> entry-point group &mdash; see
-  <code>PLAN_V2_SITE.md</code> for the registration flow this site will grow.</p>
-</section>
+<div class="card mb-3">
+  <div class="card-body">
+    <p>This site is a browsable catalog <a href="https://github.com/ir-datasets/ir-datasets"><code>ir-datasets</code></a>,
+    a Python library that provides easy access to Information Retrieval (IR) datasets. It handles downloading, extracting, and reading source files, exposing
+    document, query, and relevance judgment collections through a common interface, linked to one another in a graph.</p>
 
-<script>
-(function() {
-  var input = document.getElementById('live-search');
-  var results = document.getElementById('live-search-results');
-  var timer = null;
-  var controller = null;
+    <p>Datasets are organized into four types:</p>
+    <p class="ms-4"><a href="{{ url_for('search', type='irds:Resource') }}" class="badge badge-cat-resource">Resources</a> are raw sources, such as <a href="/n/irds:cranfield.tar.gz"><code>irds:cranfield.tar.gz</code></a>.</p>
+    <p class="ms-4"><a href="{{ url_for('search', type='irds:Table') }}" class="badge badge-cat-table">Tables</a> parse <span class="badge badge-cat-resource">Resources</span> into records with the same structure, such as <a href="/n/irds:msmarco-passage"><code>irds:msmarco-passage</code></a>.</p>
+    <p class="ms-4"><a href="{{ url_for('search', type='irds:Benchmark') }}" class="badge badge-cat-benchmark">Benchmarks</a> are combinations of <span class="badge badge-cat-table">Tables</span> to evaluate a specific task, such as <a href="/n/irds:antique-test"><code>irds:antique-test</code></a>.</p>
+    <p class="ms-4"><a href="{{ url_for('search', type='irds:Suite') }}" class="badge badge-cat-suite">Suites</a> are collections of <span class="badge badge-cat-benchmark">Benchmarks</span> that are evaluated together, such as <a href="/n/irds:bright"><code>irds:bright</code></a>.</p>
 
-  function render(items) {
-    if (!items.length) {
-      results.innerHTML = '<div class="search-empty">No matches.</div>';
-      results.hidden = false;
-      return;
-    }
-    results.innerHTML = items.map(function(item) {
-      return '<a class="search-result" href="' + item.url + '">' +
-        '<code>' + item.name + '</code>' +
-        '<span class="search-result-type">' + item.type + '</span></a>';
-    }).join('');
-    results.hidden = false;
-  }
-
-  input.addEventListener('input', function() {
-    var q = input.value.trim();
-    clearTimeout(timer);
-    if (!q) {
-      results.hidden = true;
-      results.innerHTML = '';
-      return;
-    }
-    timer = setTimeout(function() {
-      if (controller) controller.abort();
-      controller = new AbortController();
-      fetch('/api/search?q=' + encodeURIComponent(q), {signal: controller.signal})
-        .then(function(r) { return r.json(); })
-        .then(render)
-        .catch(function(e) { if (e.name !== 'AbortError') throw e; });
-    }, 150);
-  });
-
-  input.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') {
-      window.location = '/browse?q=' + encodeURIComponent(input.value.trim());
-    } else if (e.key === 'Escape') {
-      results.hidden = true;
-    }
-  });
-
-  document.addEventListener('click', function(e) {
-    if (!e.target.closest('.search-box')) {
-      results.hidden = true;
-    }
-  });
-})();
-</script>
+    <p class="mb-0">Providers: {% for prefix in providers %}<a href="{{ url_for('provider', prefix=prefix) }}"><code>{{ prefix }}</code></a>, {% endfor %}</p>
+  </div>
+</div>
 {% endblock %}

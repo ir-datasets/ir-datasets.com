@@ -1,15 +1,14 @@
 {% macro node_header(node) %}
-<div class="breadcrumb">
-  <a href="{{ url_for('provider', prefix=provider_of(node.qualified_name)) }}">{{ provider_of(node.qualified_name) }}:</a>
-  <span class="type-badge">{{ type_label(node.type) }}</span>
-</div>
-<h1><code class="select">{{ node.qualified_name }}</code></h1>
+<h2 class="mb-3">
+  <code class="select">{{ node.qualified_name }}</code>
+  <span class="badge badge-sm align-middle {{ type_badge_class(node.type) }}">{{ type_label(node.type) }}</span>
+</h2>
 {% if node.metadata.deprecated %}
-<div class="warn">{{ node.metadata.deprecated }}</div>
+<div class="alert alert-warning">{{ node.metadata.deprecated }}</div>
 {% endif %}
-{% if node.metadata.desc %}<p class="desc">{{ node.metadata.desc }}</p>{% endif %}
+{% if node.metadata.desc %}<p>{{ node.metadata.desc }}</p>{% endif %}
 {% if node.metadata.citation %}
-<p class="citation">Cite:
+<p class="text-secondary">Cite:
   {% if node_exists(node.metadata.citation) %}
   <a href="{{ node_url(node.metadata.citation) }}"><code>{{ node.metadata.citation }}</code></a>
   {% else %}
@@ -18,40 +17,47 @@
 </p>
 {% endif %}
 {% if node.metadata.metrics %}
-<p class="metrics">Official measures: {% for m in node.metadata.metrics %}<code>{{ m }}</code>{% if not loop.last %}, {% endif %}{% endfor %}</p>
+<p class="text-secondary">Official measures: {% for m in node.metadata.metrics %}<code>{{ m }}</code>{% if not loop.last %}, {% endif %}{% endfor %}</p>
 {% endif %}
 {% endmacro %}
 
 {% macro triples_section(triples, self_name) %}
 {% if triples %}
-<h2>Triples</h2>
-<p class="hint">Every edge touching this node, as subject or object &mdash; indexed, not a scan.</p>
-<table class="node-list">
-<thead><tr><th>Subject</th><th>Kind</th><th>Object</th></tr></thead>
-<tbody>
-{% for subject, kind, object, other in triples %}
-<tr>
-  <td>{% if subject == self_name %}<code class="self">{{ subject }}</code>{% else %}<a href="{{ node_url(subject) }}"><code>{{ subject }}</code></a>{% endif %}</td>
-  <td><code>{{ kind }}</code></td>
-  <td>{% if object == self_name %}<code class="self">{{ object }}</code>{% else %}<a href="{{ node_url(object) }}"><code>{{ object }}</code></a>{% endif %}</td>
-</tr>
-{% endfor %}
-</tbody>
-</table>
+<div class="card mt-3">
+  <div class="card-header"><h3 class="card-title">Triples</h3></div>
+  <div class="table-responsive">
+  <table class="table table-vcenter card-table">
+  <thead><tr><th>Subject</th><th>Kind</th><th>Object</th></tr></thead>
+  <tbody>
+  {% for subject, kind, object, other in triples %}
+  <tr>
+    <td>{% if subject == self_name %}<code class="text-secondary">{{ subject }}</code>{% else %}<a href="{{ node_url(subject) }}"><code>{{ subject }}</code></a>{% endif %}</td>
+    <td><code>{{ kind }}</code></td>
+    <td>{% if object == self_name %}<code class="text-secondary">{{ object }}</code>{% else %}<a href="{{ node_url(object) }}"><code>{{ object }}</code></a>{% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+  </table>
+  </div>
+</div>
 {% endif %}
 {% endmacro %}
 
 {% macro frozen_section(frozen) %}
 {% if frozen %}
-<h2>Frozen manifest row</h2>
-<table class="meta-table">
-<tbody>
-{% for key in ['count', 'content_sha256', 'hash_scheme', 'record_schema'] %}
-{% if key in frozen %}
-<tr><td class="k">{{ key }}</td><td class="v"><code>{{ frozen[key] }}</code></td></tr>
-{% endif %}
-{% endfor %}
-</tbody>
-</table>
+<div class="card mt-3">
+  <div class="card-header"><h3 class="card-title">Frozen manifest row</h3></div>
+  <div class="table-responsive">
+  <table class="table table-vcenter card-table">
+  <tbody>
+  {% for key in ['count', 'content_sha256', 'hash_scheme', 'record_schema'] %}
+  {% if key in frozen %}
+  <tr><td class="text-secondary w-1">{{ key }}</td><td><code>{{ frozen[key] }}</code></td></tr>
+  {% endif %}
+  {% endfor %}
+  </tbody>
+  </table>
+  </div>
+</div>
 {% endif %}
 {% endmacro %}

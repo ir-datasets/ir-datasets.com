@@ -4,26 +4,43 @@
 {% block content %}
 {{ m.node_header(node) }}
 
-<table class="meta-table">
-<tbody>
-{% if node.metadata.size %}<tr><td class="k">Size</td><td class="v">{{ '%0.1f'|format(node.metadata.size / 1000000) }} MB</td></tr>{% endif %}
-{% if node.hashes %}
-<tr><td class="k">Hashes</td><td class="v">
-  <ul>{% for algo, digest in node.hashes.items()|sort %}<li><code>{{ algo }}:{{ digest }}</code></li>{% endfor %}</ul>
-</td></tr>
-{% endif %}
-<tr><td class="k">Source(s)</td><td class="v">
-  <ul>{% for src in node.metadata.sources %}<li><code>{{ src }}</code></li>{% endfor %}</ul>
-  {% if not node.hashes %}<p class="hint">No source metadata yet has a
-  structured "manual acquisition" shape (see PLAN_V2_SITE.md) &mdash; this is
-  a raw representation for now.</p>{% endif %}
-</td></tr>
-</tbody>
-</table>
+<div class="card">
+  <div class="table-responsive">
+  <table class="table table-vcenter card-table">
+  <tbody>
+  {% if node.metadata.size %}<tr><td class="text-secondary w-1">Size</td><td>{{ '%0.1f'|format(node.metadata.size / 1000000) }} MB</td></tr>{% endif %}
+  {% if node.hashes %}
+  <tr><td class="text-secondary w-1">Hashes</td><td>
+    <ul class="mb-0">{% for algo, digest in node.hashes.items()|sort %}<li><code>{{ algo }}:{{ digest }}</code></li>{% endfor %}</ul>
+  </td></tr>
+  {% endif %}
+  {% if node.metadata.repo %}
+  <tr><td class="text-secondary w-1">Git repo</td><td>
+    {% if node.metadata.url %}
+    <a href="{{ node.metadata.url }}" target="_blank" rel="noopener"><code>{{ node.metadata.repo }}</code></a>
+    {% else %}
+    <code>{{ node.metadata.repo }}</code>
+    {% endif %}
+    {% if frozen.commit %}<span class="text-secondary">@</span><code>{{ frozen.commit }}</code>{% endif %}
+  </td></tr>
+  {% else %}
+  <tr><td class="text-secondary w-1">Source(s)</td><td>
+    <ul class="mb-0">{% for src in node.metadata.sources %}<li><code>{{ src }}</code></li>{% endfor %}</ul>
+    {% if not node.hashes %}<p class="text-secondary mt-2 mb-0">No source metadata yet has a
+    structured "manual acquisition" shape (see PLAN_V2_SITE.md) &mdash; this is
+    a raw representation for now.</p>{% endif %}
+  </td></tr>
+  {% endif %}
+  </tbody>
+  </table>
+  </div>
+</div>
 
 {% if node.metadata.dua %}
-<h2>Data usage agreement</h2>
-<p class="warn">{{ node.metadata.dua }}</p>
+<div class="card mt-3">
+  <div class="card-header"><h3 class="card-title">Data usage agreement</h3></div>
+  <div class="card-body"><div class="alert alert-warning mb-0">{{ node.metadata.dua }}</div></div>
+</div>
 {% endif %}
 
 {{ m.triples_section(triples, node.qualified_name) }}

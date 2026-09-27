@@ -1,39 +1,52 @@
 {% extends "base.html" %}
 {% block title %}{{ prefix }}: &mdash; ir-datasets.com{% endblock %}
 {% block content %}
-<h1><code>{{ prefix }}:</code></h1>
+<h2 class="mb-3"><code>{{ prefix }}:</code></h2>
 
-<section class="meta-grid">
-  <div><span class="k">Package</span><span class="v">{{ provider.package or '&mdash;' }}</span></div>
-  <div><span class="k">Nodes</span><span class="v">{{ rows|length }}</span></div>
-  <div><span class="k">Node types declared</span><span class="v">
-    {% for t in manifest.types.keys()|sort %}<code>{{ t }}</code>{% if not loop.last %}, {% endif %}{% endfor %}
-  </span></div>
-  <div><span class="k">Edge kinds declared</span><span class="v">
-    {% for k, info in manifest.edge_kinds.items()|sort %}<code>{{ k }}</code>{{ ' (structural)' if info.structural else '' }}{% if not loop.last %}, {% endif %}{% endfor %}
-  </span></div>
-  <div><span class="k">Defaultable fields</span><span class="v">{{ manifest.defaultable|join(', ') or '&mdash;' }}</span></div>
-</section>
+<div class="card mb-3">
+  <div class="card-body">
+    <div class="row">
+      <div class="col-6 col-md-3"><div class="text-secondary">Package</div><div>{{ provider.package or '&mdash;' }}</div></div>
+      <div class="col-6 col-md-3"><div class="text-secondary">Node types declared</div><div>
+        {% for t in manifest.types.keys()|sort %}<code>{{ t }}</code>{% if not loop.last %}, {% endif %}{% endfor %}
+      </div></div>
+      <div class="col-6 col-md-3"><div class="text-secondary">Edge kinds declared</div><div>
+        {% for k, info in manifest.edge_kinds.items()|sort %}<code>{{ k }}</code>{{ ' (structural)' if info.structural else '' }}{% if not loop.last %}, {% endif %}{% endfor %}
+      </div></div>
+      <div class="col-6 col-md-3"><div class="text-secondary">Defaultable fields</div><div>{{ manifest.defaultable|join(', ') or '&mdash;' }}</div></div>
+    </div>
+  </div>
+</div>
 
 {% if manifest.aliases %}
-<h2>Legacy aliases</h2>
-<table class="node-list">
-<thead><tr><th>Legacy id</th><th>Resolves to</th></tr></thead>
-<tbody>
-{% for legacy, target in manifest.aliases.items()|sort %}
-<tr><td><code>{{ legacy }}</code></td><td><a href="{{ node_url(target) }}"><code>{{ target }}</code></a></td></tr>
-{% endfor %}
-</tbody>
-</table>
+<div class="card mb-3">
+  <div class="card-header"><h3 class="card-title">Legacy aliases</h3></div>
+  <div class="table-responsive">
+  <table class="table table-vcenter card-table">
+  <thead><tr><th>Legacy id</th><th>Resolves to</th></tr></thead>
+  <tbody>
+  {% for legacy, target in manifest.aliases.items()|sort %}
+  <tr><td><code>{{ legacy }}</code></td><td><a href="{{ node_url(target) }}"><code>{{ target }}</code></a></td></tr>
+  {% endfor %}
+  </tbody>
+  </table>
+  </div>
+</div>
 {% endif %}
 
-<h2>Nodes</h2>
-<table class="node-list">
-<thead><tr><th>Name</th><th>Type</th></tr></thead>
-<tbody>
-{% for name, type in rows %}
-<tr><td><a href="{{ node_url(name) }}"><code>{{ name }}</code></a></td><td>{{ type_label(type) }}</td></tr>
-{% endfor %}
-</tbody>
-</table>
+<div class="card" data-browse-list data-name-prefix="{{ prefix }}:" data-limit="200">
+  <div class="card-header"><h3 class="card-title">Nodes</h3></div>
+  <div class="card-body">
+    <input type="text" data-browse-search value="" placeholder="filter by name&hellip;" autocomplete="off" class="form-control mb-2" />
+    <p data-browse-status class="text-secondary mb-2">loading&hellip;</p>
+  </div>
+  <div class="list-group list-group-flush" data-browse-rows></div>
+  <div data-browse-sentinel></div>
+  <template data-browse-row>
+    <div class="list-group-item py-1 d-flex align-items-center">
+      <a data-f-link href=""><code data-f-name></code></a>
+      <span data-f-type class="badge badge-sm align-middle ms-1"></span>
+    </div>
+  </template>
+</div>
 {% endblock %}

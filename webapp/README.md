@@ -1,20 +1,26 @@
 # ir-datasets.com v2 (dynamic prototype)
 
-A Flask app that renders every page per-request from the live
-`ir_datasets.v2` graph, instead of `../generate.py`'s batch-import-everything-
-and-bake-static-HTML approach. This is **phase 4** of `../PLAN_V2_SITE.md`:
+A Flask app that renders every page per-request from a **materialized**
+snapshot of the `ir_datasets.v2` graph -- a pyoxigraph RDF store built by
+`build_graph_db.py` and read by `graph_queries.py` (the RDF mapping is in
+`rdf_schema.py`) -- instead of walking `ir_datasets.v2`'s live Python objects
+on every request. This is still, per `../PLAN_V2_SITE.md`'s **phase 4**,
+pages generated per-request rather than baked once at build time
+(`../generate.py`'s approach); it's just that "assemble the graph" now
+happens once, ahead of time, instead of on every request:
 
 > Minimal dynamic app: Graph assembly from a single local manifest file +
 > dataset/benchmark pages + code-snippet generators, checked for content
 > parity against today's static pages. No registry/fetcher yet — one
 > provider, manifest read from disk.
 
-In practice that means `app.py` does `import ir_datasets.v2 as v2` and reads
-straight from `v2.graph` — the trust-free, manifest-only fetch path
-(`PLAN_V2_SITE.md`'s "key insight") is for *other* providers, added in a
-later phase; `irds` is this repo's own, trusted, first-party provider, so
-importing it directly is the right call for now, not a shortcut around the
-design.
+`irds` (this repo's own, trusted, first-party provider) and `hf` (HuggingFace
+Hub datasets, fully dynamic -- see `ir_datasets.v2.hf_provider`) are both
+materialized; `hf`'s data is necessarily a point-in-time snapshot (the store
+stamps each of its nodes with `snapshot_at`), since it can't be enumerated
+ahead of time the way a frozen manifest can. A node the last snapshot missed
+(a brand-new hf repo) still resolves -- `/n/<qualified>` falls back to a live
+`ir_datasets.v2` lookup for anything not in the store.
 
 ## Run it
 
@@ -22,11 +28,16 @@ design.
 cd ~/ws/ir-datasets.com/webapp
 pip install -r requirements.txt
 pip install -e ~/ws/ir-datasets          # if ir_datasets.v2 isn't already installed
+python build_graph_db.py                 # builds graph.db from the current manifest (+ a fresh hf crawl)
 python app.py                            # http://127.0.0.1:5000
 ```
 
-The manifest needs to exist first (`cd ~/ws/ir-datasets && python -m
-ir_datasets.v2.freeze --verify`) — the app reads live nodes, but counts,
+Re-run `build_graph_db.py` whenever `ir_datasets/v2/manifest.json` changes or
+you want a fresher `hf:` snapshot -- it's a full delete-and-recreate, not
+incremental, and takes well under a second for `irds` alone (the `hf` crawl's
+time depends on how many repos are tagged `ir-datasets` on the Hub; pass
+`--providers irds` to skip it). The manifest itself needs to exist first
+(`cd ~/ws/ir-datasets && python -m ir_datasets.v2.freeze --verify`) — counts,
 hashes and sample records only render if a manifest has been frozen.
 
 ## What's here

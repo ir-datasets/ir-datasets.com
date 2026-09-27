@@ -138,3 +138,6 @@ dmypy.json
 cython_debug/
 
 .DS_Store
+
+# Materialized graph store (built by webapp/build_graph_db.py; see webapp/README.md)
+webapp/graph.db/

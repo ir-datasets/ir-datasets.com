@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}Search &mdash; ir-datasets.com{% endblock %}
+
+{% block sidebar %}
+<div class="card">
+  <div class="card-header"><h3 class="card-title">Filters</h3></div>
+  <div class="card-body">
+    <div class="mb-3">
+      <label class="form-label">Type</label>
+      <select data-browse-type class="form-select">
+        <option value="">all types</option>
+        {% for type, label in type_filter_labels.items() %}
+        <option value="{{ type }}" {% if type == type_filter %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="form-label">Providers</label>
+      {% for p in available_providers %}
+      <label class="form-check">
+        <input type="checkbox" class="form-check-input" data-browse-provider value="{{ p }}"
+               {% if p in selected_providers %}checked{% endif %}>
+        <span class="form-check-label"><code>{{ p }}</code></span>
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card" data-browse-list data-limit="200" id="main-browse-list">
+  <div class="card-body">
+    <p data-browse-status class="text-secondary mb-2">loading&hellip;</p>
+  </div>
+  <div class="list-group list-group-flush" data-browse-rows></div>
+  <div data-browse-sentinel></div>
+  <template data-browse-row>
+    <div class="list-group-item py-1 d-flex align-items-center">
+      <a data-f-link href=""><code data-f-name></code></a>
+      <span data-f-type class="badge badge-sm align-middle ms-1"></span>
+    </div>
+  </template>
+</div>
+{% endblock %}
