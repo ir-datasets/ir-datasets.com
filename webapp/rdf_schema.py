@@ -20,7 +20,7 @@ field name (when ``object`` is a ``v2.Literal`` -- ir_datasets's own RDF-style
 literal marker, unrelated to ``typing.Literal`` -- mapped under META).
 
 Every quad also gets a **named graph**: a triple's own subject's provider
-prefix (``irds``, ``hf``, ``clirmatrix``), so the store's native
+prefix (``irds``, ``hf``, ``clirmatrix``, ``legacy``), so the store's native
 partitioning mechanism (not a predicate/property) is what the
 provider-filter checkboxes query against. (CLIRMatrix is ~620k of the ~623k
 nodes in the catalog -- large enough that it needing its own real

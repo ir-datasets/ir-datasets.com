@@ -5,7 +5,7 @@
 <div class="row row-cards mb-3">
   {% for type, label in type_labels.items() %}
   <div class="col-6 col-lg-3">
-    <a class="card card-link border-top border-3 border-cat-{{ type_color(type) }}" href="{{ url_for('search', type=type) }}">
+    <a class="card card-link border-top border-5 border-cat-{{ type_color(type) }}" href="{{ url_for('search', type=type) }}">
       <div class="card-body text-center">
         <div class="h1 mb-0 text-cat-{{ type_color(type) }}">{{ counts[type] }}</div>
         <div class="text-cat-{{ type_color(type) }}">{{ label }}</div>
@@ -22,12 +22,12 @@
     document, query, and relevance judgment collections through a common interface, linked to one another in a graph.</p>
 
     <p>Datasets are organized into four types:</p>
-    <p class="ms-4"><a href="{{ url_for('search', type='irds:Resource') }}" class="badge badge-cat-resource">Resources</a> are raw sources, such as <a href="/n/irds:cranfield.tar.gz"><code>irds:cranfield.tar.gz</code></a>.</p>
-    <p class="ms-4"><a href="{{ url_for('search', type='irds:Table') }}" class="badge badge-cat-table">Tables</a> parse <span class="badge badge-cat-resource">Resources</span> into records with the same structure, such as <a href="/n/irds:msmarco-passage"><code>irds:msmarco-passage</code></a>.</p>
-    <p class="ms-4"><a href="{{ url_for('search', type='irds:Benchmark') }}" class="badge badge-cat-benchmark">Benchmarks</a> are combinations of <span class="badge badge-cat-table">Tables</span> to evaluate a specific task, such as <a href="/n/irds:antique-test"><code>irds:antique-test</code></a>.</p>
-    <p class="ms-4"><a href="{{ url_for('search', type='irds:Suite') }}" class="badge badge-cat-suite">Suites</a> are collections of <span class="badge badge-cat-benchmark">Benchmarks</span> that are evaluated together, such as <a href="/n/irds:bright"><code>irds:bright</code></a>.</p>
+    <p class="ms-4"><a href="{{ url_for('search', type='irds:Resource') }}" class="badge badge-cat-resource">Resources</a> are raw sources, like downloadable files. Example: <a href="/n/irds:cranfield.tar.gz"><code>irds:cranfield.tar.gz</code></a></p>
+    <p class="ms-4"><a href="{{ url_for('search', type='irds:Table') }}" class="badge badge-cat-table">Tables</a> parse <strong class="text-cat-resource">Resources</strong> into records with the same structure. Example: <a href="/n/irds:msmarco-passage"><code>irds:msmarco-passage</code></a></p>
+    <p class="ms-4"><a href="{{ url_for('search', type='irds:Benchmark') }}" class="badge badge-cat-benchmark">Benchmarks</a> are combinations of <strong class="text-cat-table">Tables</strong> to evaluate a specific task. Example: <a href="/n/irds:antique-test"><code>irds:antique-test</code></a></p>
+    <p class="ms-4"><a href="{{ url_for('search', type='irds:Suite') }}" class="badge badge-cat-suite">Suites</a> are collections of <strong class="text-cat-benchmark">Benchmarks</strong> that are evaluated together. Example: <a href="/n/irds:bright"><code>irds:bright</code></a></p>
 
-    <p class="mb-0">Providers: {% for prefix in providers %}<a href="{{ url_for('provider', prefix=prefix) }}"><code>{{ prefix }}</code></a>, {% endfor %}</p>
+    <p class="mb-0">Providers: {% for prefix in providers %}<a href="{{ url_for('provider', prefix=prefix) }}"><code>{{ prefix }}</code></a>{% if not loop.last %}, {% endif %}{% endfor %}</p>
   </div>
 </div>
 {% endblock %}

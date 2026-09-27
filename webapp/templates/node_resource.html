@@ -9,26 +9,27 @@
   <table class="table table-vcenter card-table">
   <tbody>
   {% if node.metadata.size %}<tr><td class="text-secondary w-1">Size</td><td>{{ '%0.1f'|format(node.metadata.size / 1000000) }} MB</td></tr>{% endif %}
-  {% if node.hashes %}
-  <tr><td class="text-secondary w-1">Hashes</td><td>
-    <ul class="mb-0">{% for algo, digest in node.hashes.items()|sort %}<li><code>{{ algo }}:{{ digest }}</code></li>{% endfor %}</ul>
-  </td></tr>
-  {% endif %}
   {% if node.metadata.repo %}
-  <tr><td class="text-secondary w-1">Git repo</td><td>
+  <tr><td class="text-secondary w-1 text-nowrap">Git Repository</td><td>
     {% if node.metadata.url %}
-    <a href="{{ node.metadata.url }}" target="_blank" rel="noopener"><code>{{ node.metadata.repo }}</code></a>
+    <a href="{{ node.metadata.url }}" target="_blank" rel="noopener"><code>{{ node.metadata.url }}</code></a>
     {% else %}
     <code>{{ node.metadata.repo }}</code>
     {% endif %}
-    {% if frozen.commit %}<span class="text-secondary">@</span><code>{{ frozen.commit }}</code>{% endif %}
   </td></tr>
+  {% if frozen.commit %}
+  <tr><td class="text-secondary w-1 text-nowrap">Commit Hash</td><td>
+    <code>{{ frozen.commit }}</code>
+  </td></tr>
+  {% endif %}
   {% else %}
-  <tr><td class="text-secondary w-1">Source(s)</td><td>
-    <ul class="mb-0">{% for src in node.metadata.sources %}<li><code>{{ src }}</code></li>{% endfor %}</ul>
-    {% if not node.hashes %}<p class="text-secondary mt-2 mb-0">No source metadata yet has a
-    structured "manual acquisition" shape (see PLAN_V2_SITE.md) &mdash; this is
-    a raw representation for now.</p>{% endif %}
+  <tr><td class="text-secondary w-1">Sources</td><td>
+    {% for src in node.metadata.sources %}<div><code>{{ src }}</code></div>{% endfor %}
+  </td></tr>
+  {% endif %}
+  {% if node.hashes %}
+  <tr><td class="text-secondary w-1">Hashes</td><td>
+    {% for algo, digest in node.hashes.items()|sort %}<div><code>{{ algo }}:{{ digest }}</code></div>{% endfor %}
   </td></tr>
   {% endif %}
   </tbody>

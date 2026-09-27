@@ -4,7 +4,10 @@
 
 {% block sidebar %}
 <div class="card">
-  <div class="card-header"><h3 class="card-title">Filters</h3></div>
+  <div class="card-header">
+    <h3 class="card-title">Filters</h3>
+    <span class="text-secondary ms-auto" data-filters-count>{{ total }} node{{ '' if total == 1 else 's' }}</span>
+  </div>
   <div class="card-body">
     <div class="mb-3">
       <label class="form-label">Type</label>
@@ -31,14 +34,12 @@
 
 {% block content %}
 <div class="card" data-browse-list data-limit="200" id="main-browse-list">
-  <div class="card-body">
-    <p data-browse-status class="text-secondary mb-2">loading&hellip;</p>
-  </div>
+  <p data-browse-status class="text-secondary mb-0" hidden></p>
   <div class="list-group list-group-flush" data-browse-rows></div>
   <div data-browse-sentinel></div>
   <template data-browse-row>
     <div class="list-group-item py-1 d-flex align-items-center">
-      <a data-f-link href=""><code data-f-name></code></a>
+      <a data-f-link href=""><code><span data-f-prefix class="text-secondary"></span><span data-f-name></span></code></a>
       <span data-f-type class="badge badge-sm align-middle ms-1"></span>
     </div>
   </template>

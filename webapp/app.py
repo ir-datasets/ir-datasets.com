@@ -85,6 +85,15 @@ TEMPLATE_BY_TYPE = {
     v2.SUITE: 'node_suite.html',
 }
 
+#: Exact-type template overrides, checked before the category-based
+#: ``TEMPLATE_BY_TYPE`` lookup above -- for a type that isn't part of that
+#: four-category hierarchy at all (``legacy:V1Dataset`` is its own axis, not
+#: a Resource/Table/Benchmark/Suite) but still deserves its own page rather
+#: than node_generic.html's raw metadata dump.
+TEMPLATE_BY_EXACT_TYPE = {
+    'legacy:V1Dataset': 'node_legacy.html',
+}
+
 #: One custom color per top-level category (a specific brand palette, not
 #: one of Tabler's named colors), used everywhere a type shows up with its
 #: own color: a badge (a node page's header, /search's and
@@ -115,11 +124,13 @@ PAGE_SIZE = 200
 MAX_PAGE_SIZE = 1000
 
 #: Provider-filter checkboxes default to every available provider-graph
-#: (see rdf_schema.graph_for) EXCEPT this one -- CLIRMatrix alone is ~620k of
+#: (see rdf_schema.graph_for) EXCEPT these -- CLIRMatrix alone is ~620k of
 #: the ~623k nodes in the catalog, so showing it by default would swamp
 #: every other, much smaller family a first-time visitor is more likely to
-#: actually want.
-DEFAULT_HIDDEN_PROVIDERS = {'clirmatrix'}
+#: actually want; ``legacy`` (every dataset's old v1 id -- see
+#: rdf_schema.graph_for) is one alias per real node, so showing both by
+#: default would double up half the catalog under a second, redundant name.
+DEFAULT_HIDDEN_PROVIDERS = {'clirmatrix', 'legacy'}
 
 
 def _selected_providers(scope=None):
@@ -282,7 +293,10 @@ def index():
     counts = gq.counts_by_type(store, list(TYPE_LABELS), providers=_selected_providers())
     return render_template(
         'index.html', counts=counts, has_sidebar=False,
-        providers=sorted(v2.graph.providers), type_labels=TYPE_LABELS_PLURAL)
+        # irds sorts first (the original, primary provider), same as
+        # graph_queries.available_providers.
+        providers=sorted(v2.graph.providers, key=lambda p: (p != 'irds', p)),
+        type_labels=TYPE_LABELS_PLURAL)
 
 
 @app.route('/search')
@@ -293,13 +307,21 @@ def search():
     real link (a stat card, a provider page). Unlike the home page, this one
     has the Type/Provider filter sidebar."""
     selected = _selected_providers()
+    type_filter = request.args.get('type') or ''
+    query = request.args.get('q') or ''
+    # Server-rendered so the Filters card's own count shows on first paint,
+    # not just after static/browse.js's first /api/browse response lands
+    # (limit=0: this route only wants the total, not any rows).
+    _, total = gq.list_nodes(store, type_filter=type_filter or None, query=query or None,
+                             providers=selected, limit=0)
     return render_template(
         'search.html', has_sidebar=True,
         type_filter_labels=TYPE_LABELS,
-        type_filter=request.args.get('type') or '',
-        query=request.args.get('q') or '',
+        type_filter=type_filter,
+        query=query,
         available_providers=gq.available_providers(store),
-        selected_providers=selected)
+        selected_providers=selected,
+        total=total)
 
 
 @app.route('/api/browse')
@@ -341,16 +363,6 @@ def api_browse():
     })
 
 
-@app.route('/api/counts')
-def api_counts():
-    """JSON stat-card counts for the current provider-filter selection (see
-    ``_selected_providers``) -- fetched by the home/browse page's checkboxes
-    on every change, so the stat cards never show a stale total for a
-    provider selection the listing below them no longer matches."""
-    counts = gq.counts_by_type(store, list(TYPE_LABELS), providers=_selected_providers())
-    return jsonify({t: counts[t] for t in TYPE_LABELS})
-
-
 @app.route('/provider/<prefix>')
 def provider(prefix):
     """No provider-filter checkboxes here (unlike the home page) -- each
@@ -380,7 +392,8 @@ def node(qualified):
         except KeyError as e:
             abort(404, str(e))
     category = _category_of(n.type)
-    template = TEMPLATE_BY_TYPE.get(category, 'node_generic.html')
+    template = (TEMPLATE_BY_EXACT_TYPE.get(n.type)
+                or TEMPLATE_BY_TYPE.get(category, 'node_generic.html'))
     frozen = n._frozen()
     return render_template(
         template, node=n, frozen=frozen, triples=triples,

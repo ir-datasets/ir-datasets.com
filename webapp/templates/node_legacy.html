@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}{{ node.qualified_name }} &mdash; ir-datasets.com{% endblock %}
+{% block content %}
+{{ m.node_header(node) }}
+<p class="text-secondary">A dataset id from v1 <code>ir_datasets</code> (the id used in
+published papers before this site's v2 knowledge-graph rewrite), kept addressable here
+for continuity rather than dropped.</p>
+
+{% set replaced_by = [] %}
+{% for subject, kind, object, other in triples if kind == 'legacy:replaced_by' %}
+{% set _ = replaced_by.append(object) %}
+{% endfor %}
+
+<div class="card">
+  <div class="card-body">
+  {% if replaced_by %}
+  <div class="d-flex align-items-center gap-2">
+    <span class="text-secondary">Replaced by</span>
+    <a href="{{ node_url(replaced_by[0]) }}"><code>{{ replaced_by[0] }}</code></a>
+  </div>
+  {% else %}
+  <p class="mb-0 text-secondary">No known v2 replacement for this id.</p>
+  {% endif %}
+  </div>
+</div>
+
+<div class="card mt-3">
+  <div class="card-header"><h3 class="card-title">Try it</h3></div>
+  <div class="card-body"><pre class="bg-dark-lt rounded p-3 overflow-auto mb-0">import ir_datasets.v2
+node = ir_datasets.v2.load({{ node.qualified_name[7:]|tojson }})  # the old (v1) id still resolves</pre></div>
+</div>
+
+{{ m.triples_section(triples, node.qualified_name) }}
+{% endblock %}

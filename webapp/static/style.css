@@ -46,3 +46,100 @@ code {
 .badge-cat-benchmark, a.badge-cat-benchmark { background: var(--cat-benchmark); color: #fff; }
 .badge-cat-suite, a.badge-cat-suite { background: var(--cat-suite); color: #fff; }
 .badge-cat-default, a.badge-cat-default { background: var(--cat-default); color: #fff; }
+
+/* subject --edge--> object rows (triples_section macro): one grid shared by
+   every row, so the subject/object columns line up and the arrow is the
+   same length everywhere, instead of a 3-column table. */
+.triples-grid {
+  display: grid;
+  grid-template-columns: max-content max-content minmax(0, max-content);
+  align-items: center;
+  column-gap: .75rem;
+  padding: 0 1rem;
+  overflow-x: auto;
+}
+
+.triples-grid > * {
+  padding-block: .5rem;
+}
+
+.triple-edge {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.triple-edge-line {
+  flex: 1 1 1.25rem;
+  min-width: 1.25rem;
+  height: 0;
+  border-top: 1px solid var(--tblr-secondary-color);
+}
+
+.triple-edge-arrowhead {
+  flex: 0 0 auto;
+  width: 0;
+  height: 0;
+  border: 4px solid transparent;
+  border-left-color: var(--tblr-secondary-color);
+  border-right-width: 0;
+}
+
+.triple-edge-label {
+  flex: 0 0 auto;
+  padding: 0 .4rem;
+  white-space: nowrap;
+}
+
+/* /search's Filters sidebar (base.html's has_sidebar block) stays in view
+   while the results list beside it scrolls -- only above the `lg` breakpoint
+   (col-lg-3), matching base.html's own grid: below `lg` the sidebar and the
+   list stack in one column, where "sticking" the sidebar would just pin it
+   over the list instead of scrolling normally with it. `top` matches the
+   sticky header's own height at that width (measured: 56px, a single-row
+   navbar from `lg` up) so the two don't overlap; .row's default
+   align-items: stretch would otherwise stretch this column to match the
+   (taller) results list, leaving no room for it to move at all. */
+@media (min-width: 992px) {
+  .filters-sidebar {
+    position: sticky;
+    top: 56px;
+    align-self: start;
+  }
+}
+
+/* Search/browse result rows (search.html, provider.html -- both share this
+   [data-browse-rows] list-group markup via static/browse.js): no line
+   between rows, just the card's own outer edge. Tabler's .list-group-flush
+   puts a border on both the items *and* the list-group container itself
+   (top *and* bottom of the container) -- the latter is what showed up as a
+   stray line below the last row, and (once the container had its own
+   padding -- see below -- putting daylight between it and whatever's above)
+   above the first, since removing only the item borders left the
+   container's own top/bottom border in place. */
+[data-browse-rows].list-group-flush,
+[data-browse-rows] .list-group-item {
+  border-top: 0;
+  border-bottom: 0;
+}
+
+/* A little breathing room above the first row and below the last, now that
+   there's no header/border separating the list from the card edge (or from
+   static/browse.js's skeleton rows) above it. Only when there's something
+   to pad, though -- an empty list (the "no nodes match"/error message is
+   the only thing in the card then) would otherwise still claim this much
+   height for nothing, reading as extra blank space below that message. */
+[data-browse-rows]:not(:empty) {
+  padding-block: .5rem;
+}
+
+/* static/browse.js's "no nodes match"/error message (data-browse-status,
+   toggled via .browse-status-empty) -- an empty-state look instead of a
+   plain inline line, since with no header this is the only thing in the
+   card when it's showing. */
+[data-browse-status].browse-status-empty {
+  text-align: center;
+  padding: 2rem 1rem;
+  margin: 0;
+}
+

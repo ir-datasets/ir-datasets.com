@@ -130,24 +130,37 @@ def triples_of(store, name):
     return rows
 
 
-#: (name, type, provider) for every materialized node, sorted by name,
-#: computed once per process (the store is read-only and never changes while
-#: the app runs -- see build_graph_db.py/README.md's "restart after
-#: rebuild"). ``provider`` is the quad's own named graph (see
-#: rdf_schema.graph_for), not re-derived by parsing ``name`` -- the graph
-#: *is* the provider-filter partition. With ~620k CLIRMatrix-inflated nodes
-#: in the catalog, re-scanning the store's rdf:type quads from scratch on
-#: every request (as this used to do) cost ~0.5s each; caching the one full
-#: scan turns every subsequent list/count into an in-memory filter instead.
+#: (name, type, provider) for every materialized node, sorted by name *with
+#: its provider prefix ignored* (``irds:antique-docs`` sorts next to
+#: ``hf:neuclir/csl``'s neighbors by "antique-docs" vs. "neuclir/csl", not
+#: bucketed under "irds:"/"hf:" first) -- the prefix is real identity, not
+#: noise, but a listing spanning providers reads more like "the catalog,
+#: alphabetically" and less like "provider A's catalog, then provider B's"
+#: this way. The full name (prefix included) breaks ties between two
+#: providers' same-named node, so ordering stays deterministic. Computed
+#: once per process (the store is read-only and never changes while the app
+#: runs -- see build_graph_db.py/README.md's "restart after rebuild").
+#: ``provider`` is the quad's own named graph (see rdf_schema.graph_for),
+#: not re-derived by parsing ``name`` -- the graph *is* the provider-filter
+#: partition. With ~620k CLIRMatrix-inflated nodes in the catalog,
+#: re-scanning the store's rdf:type quads from scratch on every request (as
+#: this used to do) cost ~0.5s each; caching the one full scan turns every
+#: subsequent list/count into an in-memory filter instead.
 _type_rows_cache = None
+
+
+def _sort_key(row):
+    name = row[0]
+    return (name.split(':', 1)[-1], name)
 
 
 def _all_type_rows(store):
     global _type_rows_cache
     if _type_rows_cache is None:
         _type_rows_cache = sorted(
-            (node_name(q.subject), type_name(q.object), graph_name(q.graph_name))
-            for q in store.quads_for_pattern(None, RDF_TYPE, None, None))
+            ((node_name(q.subject), type_name(q.object), graph_name(q.graph_name))
+             for q in store.quads_for_pattern(None, RDF_TYPE, None, None)),
+            key=_sort_key)
     return _type_rows_cache
 
 

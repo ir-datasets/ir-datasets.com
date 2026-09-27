@@ -10,6 +10,14 @@
     return location.pathname === '/search';
   }
 
+  //: the real navigation (pushState) only happens once the fetch below
+  //: resolves, so onSearchPage() still reads false for every keystroke
+  //: typed before that -- without debouncing and aborting here, each one
+  //: fires its own overlapping /search fetch (a burst of duplicate
+  //: requests for a single typed word).
+  var debounceTimer = null;
+  var pendingController = null;
+
   //: URLSearchParams.toString() percent-encodes commas (providers=a%2Cb%2Cc)
   //: even though a comma is a valid, unreserved character in a query string
   //: -- undo that just for the address bar, so ?providers=hf,irds stays readable.
@@ -25,8 +33,13 @@
   }
 
   function swapToSearchPage(params) {
+    // Cancel whatever's still in flight from the previous keystroke -- only
+    // the latest typed value should ever hit the network or the DOM.
+    if (pendingController) pendingController.abort();
+    var controller = new AbortController();
+    pendingController = controller;
     var url = '/search' + (params.toString() ? '?' + toQueryString(params) : '');
-    fetch(url)
+    fetch(url, {signal: controller.signal})
       .then(function (r) { return r.text(); })
       .then(function (html) {
         var doc = new DOMParser().parseFromString(html, 'text/html');
@@ -38,7 +51,8 @@
         history.pushState({fakeNav: true}, '', url);
         if (window.initBrowseWidgets) window.initBrowseWidgets();
       })
-      .catch(function () {
+      .catch(function (err) {
+        if (err && err.name === 'AbortError') return;  // superseded, not a failure
         // Something about the fetch/parse failed -- fall back to a real
         // navigation rather than leaving the page stuck.
         window.location.href = url;
@@ -47,7 +61,11 @@
 
   document.addEventListener('input', function (e) {
     if (!e.target.matches('[data-nav-search]')) return;
-    if (!onSearchPage()) swapToSearchPage(currentNavParams());
+    if (onSearchPage()) return;
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(function () {
+      swapToSearchPage(currentNavParams());
+    }, 150);
   });
 
   // Dispatched (bubbling) by static/browse.js whenever the search/type/
