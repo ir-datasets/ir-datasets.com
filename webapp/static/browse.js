@@ -23,6 +23,10 @@
     //: navbar, outside the results container entirely; see base.html).
     //: type/provider controls always live in the sidebar, outside `root`.
     var searchInput = root.querySelector('[data-browse-search]') || document.querySelector('[data-browse-search]');
+    //: same root-first-then-document-wide lookup as searchInput above, since
+    //: the toggle always sits right next to whichever search box it belongs
+    //: to (see .search-input-wrap in base.html/provider.html).
+    var regexToggle = root.querySelector('[data-regex-toggle]') || document.querySelector('[data-regex-toggle]');
     var typeSelect = document.querySelector('[data-browse-type]');
     var providerBoxes = document.querySelectorAll('[data-browse-provider]');
     var namePrefix = root.getAttribute('data-name-prefix') || '';
@@ -101,6 +105,7 @@
     function buildParams() {
       var params = new URLSearchParams();
       if (searchInput && searchInput.value.trim()) params.set('q', searchInput.value.trim());
+      if (regexToggle && regexToggle.getAttribute('aria-pressed') === 'true') params.set('regex', '1');
       if (typeSelect && typeSelect.value) params.set('type', typeSelect.value);
       if (namePrefix) params.set('prefix', namePrefix);
       if (providerBoxes.length) params.set('providers', selectedProviders().join(','));
@@ -191,6 +196,12 @@
     }
 
     if (searchInput) searchInput.addEventListener('input', onFilterChange);
+    if (regexToggle) regexToggle.addEventListener('click', function () {
+      regexToggle.setAttribute('aria-pressed', regexToggle.getAttribute('aria-pressed') !== 'true' ? 'true' : 'false');
+      //: only re-search when there's actually a query to re-interpret --
+      //: matches searchInput's own no-op-on-empty behavior in buildParams.
+      if (searchInput && searchInput.value.trim()) onFilterChange();
+    });
     if (typeSelect) typeSelect.addEventListener('change', onFilterChange);
     providerBoxes.forEach(function (box) { box.addEventListener('change', onFilterChange); });
 

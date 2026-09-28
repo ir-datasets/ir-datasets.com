@@ -29,6 +29,8 @@
     var params = new URLSearchParams();
     var q = document.querySelector('[data-nav-search]');
     if (q && q.value.trim()) params.set('q', q.value.trim());
+    var regexToggle = document.querySelector('[data-regex-toggle]');
+    if (regexToggle && regexToggle.getAttribute('aria-pressed') === 'true') params.set('regex', '1');
     return params;
   }
 
@@ -66,6 +68,25 @@
     debounceTimer = setTimeout(function () {
       swapToSearchPage(currentNavParams());
     }, 150);
+  });
+
+  //: the regex toggle sitting next to the navbar search box (see
+  //: [data-regex-toggle] in base.html) needs the same fake-nav treatment as
+  //: typing above -- on /search itself, static/browse.js already owns the
+  //: toggle (it re-runs its own search and fires browse:filterchange, caught
+  //: below); everywhere else, nothing is listening for the click, so it must
+  //: kick off the fake nav here, same as the first keystroke does.
+  document.addEventListener('click', function (e) {
+    var toggle = e.target.closest && e.target.closest('[data-regex-toggle]');
+    //: .navbar-search (base.html) scopes this to the navbar's own toggle --
+    //: /provider/<prefix>'s local toggle lives in its own [data-browse-list]
+    //: card instead, and static/browse.js already owns that one.
+    if (!toggle || !toggle.closest('.navbar-search')) return;
+    if (onSearchPage()) return;
+    var q = document.querySelector('[data-nav-search]');
+    if (!q || !q.value.trim()) return;  // matches browse.js's own no-op-on-empty rule
+    toggle.setAttribute('aria-pressed', toggle.getAttribute('aria-pressed') !== 'true' ? 'true' : 'false');
+    swapToSearchPage(currentNavParams());
   });
 
   // Dispatched (bubbling) by static/browse.js whenever the search/type/

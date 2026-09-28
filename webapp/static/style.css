@@ -10,6 +10,35 @@ code {
 
 [data-browse-sentinel] { height: 1px; }
 
+/* Regex-mode toggle for a search box (navbar, /provider/<prefix> -- both
+   wrapped in .search-input-wrap by base.html/provider.html): a right-aligned
+   icon button inside the input itself rather than a separate control, so it
+   reads as part of the search box. Active state fills with Tabler's primary
+   color, doubling as the on/off indicator -- see static/browse.js for the
+   click handling and [data-regex-toggle] lookup. */
+.search-input-wrap { position: relative; }
+.search-input-wrap .form-control { padding-right: 2.25rem; }
+.search-regex-toggle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 2.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: var(--tblr-secondary);
+  border-radius: 0 var(--tblr-border-radius) var(--tblr-border-radius) 0;
+}
+.search-regex-toggle:hover { color: var(--tblr-body-color); }
+.search-regex-toggle[aria-pressed="true"] {
+  color: #fff;
+  background: var(--tblr-primary);
+}
+
 /* Tabler's badge-sm vertically centers its text a little high (no
    descender room) -- nudge it down so it looks balanced next to a node
    name's baseline (search/provider rows, a node page's header). */
@@ -84,6 +113,7 @@ code {
   display: grid;
   grid-template-columns: max-content max-content minmax(0, max-content);
   align-items: center;
+  justify-content: center;
   column-gap: .75rem;
   padding: 0 1rem;
   overflow-x: auto;
@@ -99,37 +129,11 @@ code {
   width: 100%;
 }
 
-/* The subject column's grid item stretches to the width of the *longest*
-   subject across all rows (the column is sized `max-content`), so a
-   shorter row's text leaves real slack between itself and the column's
-   right edge -- a fixed-width bridge alone can't close that (it doesn't
-   know how much slack a given row has). Instead .triple-subject is a flex
-   row of [text, growing line]: the line (flex: 1) consumes exactly that
-   row's own slack, so it always starts right at the text. `position:
-   relative` + `::after` then bridges the one thing that *is* fixed for
-   every row: the grid's own column-gap between this column and the next. */
+.triple-node {
+  white-space: nowrap;
+}
 .triple-subject {
-  display: flex;
-  align-items: center;
-  position: relative;
-}
-.triple-node-line {
-  flex: 1 1 auto;
-  min-width: .5rem;
-  height: 0;
-  margin-left: .8rem;
-  border-top: 1px solid var(--tblr-secondary-color);
-  transform: translateY(1px);
-}
-.triple-subject::after {
-  content: '';
-  position: absolute;
-  left: 100%;
-  top: 50%;
-  width: .75rem;
-  height: 0;
-  border-top: 1px solid var(--tblr-secondary-color);
-  transform: translateY(calc(-50% + 1px));
+  text-align: right;
 }
 
 .triple-edge-line {

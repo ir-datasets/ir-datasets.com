@@ -309,16 +309,18 @@ def search():
     selected = _selected_providers()
     type_filter = request.args.get('type') or ''
     query = request.args.get('q') or ''
+    regex = request.args.get('regex') in ('1', 'true')
     # Server-rendered so the Filters card's own count shows on first paint,
     # not just after static/browse.js's first /api/browse response lands
     # (limit=0: this route only wants the total, not any rows).
     _, total = gq.list_nodes(store, type_filter=type_filter or None, query=query or None,
-                             providers=selected, limit=0)
+                             providers=selected, limit=0, regex=regex)
     return render_template(
         'search.html', has_sidebar=True,
         type_filter_labels=TYPE_LABELS,
         type_filter=type_filter,
         query=query,
+        regex=regex,
         available_providers=gq.available_providers(store),
         selected_providers=selected,
         total=total)
@@ -328,8 +330,8 @@ def search():
 def api_browse():
     """JSON backing both the home page's and /provider/<prefix>'s live,
     infinite-scrolling listings -- one endpoint, one query shape (``q``/
-    ``type``/``name_prefix``/``providers``/``offset``/``limit``), so there is
-    exactly one place that knows how to page through a catalog CLIRMatrix
+    ``regex``/``type``/``name_prefix``/``providers``/``offset``/``limit``),
+    so there is exactly one place that knows how to page through a catalog CLIRMatrix
     alone has made ~620k rows large. ``limit`` is capped, not just defaulted,
     so a crafted request can't force one huge response. ``providers``
     (comma-separated) follows ``_selected_providers``'s own "key absent ->
@@ -339,6 +341,7 @@ def api_browse():
     /provider/clirmatrix's own page isn't empty by default just because
     CLIRMatrix is hidden everywhere else."""
     query = (request.args.get('q') or '').strip() or None
+    regex = request.args.get('regex') in ('1', 'true')
     type_filter = request.args.get('type') or None
     name_prefix = request.args.get('prefix') or None
     try:
@@ -352,7 +355,7 @@ def api_browse():
     scope = {name_prefix.rstrip(':')} if name_prefix else None
     rows, total = gq.list_nodes(store, type_filter=type_filter, query=query,
                                 name_prefix=name_prefix, providers=_selected_providers(scope=scope),
-                                limit=limit, offset=offset)
+                                limit=limit, offset=offset, regex=regex)
     return jsonify({
         'rows': [{'name': name, 'type_label': _type_label(type_), 'type': type_,
                  'badge_class': _type_badge_class(type_),

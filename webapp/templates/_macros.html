@@ -27,7 +27,7 @@
   <div class="card-header"><h3 class="card-title">Triples</h3></div>
   <div class="triples-grid">
   {% for subject, kind, object, other in triples %}
-  <span class="triple-node triple-subject">{% if subject == self_name %}<code class="text-secondary">{{ subject }}</code>{% else %}<a href="{{ node_url(subject) }}"><code>{{ subject }}</code></a>{% endif %}<span class="triple-node-line"></span></span>
+  <span class="triple-node triple-subject">{% if subject == self_name %}<code class="text-secondary">{{ subject }}</code>{% else %}<a href="{{ node_url(subject) }}"><code>{{ subject }}</code></a>{% endif %}</span>
   <span class="triple-edge"><span class="triple-edge-line"></span><span class="triple-edge-label"><code>{{ kind }}</code></span><span class="triple-edge-line"></span><span class="triple-edge-arrowhead"></span></span>
   <span class="triple-node">{% if object == self_name %}<code class="text-secondary">{{ object }}</code>{% else %}<a href="{{ node_url(object) }}"><code>{{ object }}</code></a>{% endif %}</span>
   {% endfor %}

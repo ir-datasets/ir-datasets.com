@@ -9,6 +9,7 @@ consume (``(subject, kind, object, other)`` triples, ``(name, type)`` pairs,
 ...), so ``app.py``'s routes and the templates don't need to change.
 """
 import json
+import re
 
 from rdf_schema import (
     FROZEN_FIELDS, RDF_TYPE, RDFS_SUBCLASS_OF, edge_iri, edge_kind, graph_name,
@@ -204,11 +205,12 @@ def _subtype_closure(store, qualified_type):
 
 
 def list_nodes(store, type_filter=None, query=None, name_prefix=None,
-              providers=None, limit=None, offset=0):
+              providers=None, limit=None, offset=0, regex=False):
     """``(rows, total)`` -- ``(name, type)`` pairs for materialized nodes,
-    optionally restricted to a type (and its subtypes), a name substring,
-    a name prefix (a provider's own ``"prefix:"`` namespace), and/or a set of
-    enabled provider-graphs (``providers=None`` means no filtering; an empty
+    optionally restricted to a type (and its subtypes), a name substring (or,
+    with ``regex=True``, a name regex -- see below), a name prefix (a
+    provider's own ``"prefix:"`` namespace), and/or a set of enabled
+    provider-graphs (``providers=None`` means no filtering; an empty
     set/list means nothing matches), sorted by name. ``total`` is the count
     *before* slicing by ``limit``/``offset`` -- a page's own caller needs it
     to render "N of M" / infinite-scroll state; with ~620k CLIRMatrix-
@@ -224,8 +226,27 @@ def list_nodes(store, type_filter=None, query=None, name_prefix=None,
     if name_prefix:
         rows = [r for r in rows if r[0].startswith(name_prefix)]
     if query:
-        q = query.lower()
-        rows = [r for r in rows if q in r[0].lower()]
+        if regex:
+            #: the query box re-searches on every keystroke (see
+            #: static/browse.js), so a pattern is very often mid-edit and
+            #: invalid (an unclosed group, a trailing backslash, ...) -- fall
+            #: back to the same substring match as the non-regex path rather
+            #: than erroring the whole listing out from under the user for
+            #: what's usually just a not-yet-finished pattern.
+            #: matched against the name with its "provider:" prefix stripped
+            #: -- the provider is already its own filter (the Providers
+            #: checkboxes / `providers=`), so a pattern like `^foo` shouldn't
+            #: have to account for an arbitrary "irds:"/"hf:"/... in front of
+            #: the part the user actually means to anchor against.
+            try:
+                pattern = re.compile(query, re.IGNORECASE)
+                rows = [r for r in rows if pattern.search(r[0].split(':', 1)[-1])]
+            except re.error:
+                q = query.lower()
+                rows = [r for r in rows if q in r[0].lower()]
+        else:
+            q = query.lower()
+            rows = [r for r in rows if q in r[0].lower()]
     total = len(rows)
     if limit is not None:
         rows = rows[offset:offset + limit]

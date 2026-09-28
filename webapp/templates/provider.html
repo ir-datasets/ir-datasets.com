@@ -37,7 +37,17 @@
 <div class="card" data-browse-list data-name-prefix="{{ prefix }}:" data-limit="200">
   <div class="card-header"><h3 class="card-title">Nodes</h3></div>
   <div class="card-body">
-    <input type="text" data-browse-search value="" placeholder="filter by name&hellip;" autocomplete="off" class="form-control mb-2" />
+    <div class="search-input-wrap mb-2">
+      <input type="text" data-browse-search value="" placeholder="filter by name&hellip;" autocomplete="off" class="form-control" />
+      <button type="button" class="search-regex-toggle" data-regex-toggle aria-pressed="false" title="Match as regular expression">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+          <path d="M17 8v6a2 2 0 1 0 4 0v-1a2 2 0 1 0 -4 0v1" />
+          <path d="M14 16v-3a2 2 0 1 0 -4 0v1a2 2 0 0 0 3.726 1.01" />
+          <path d="M3 10l2 -2l2 2" />
+        </svg>
+      </button>
+    </div>
     <p data-browse-status class="text-secondary mb-2" hidden></p>
   </div>
   <div class="list-group list-group-flush" data-browse-rows></div>
