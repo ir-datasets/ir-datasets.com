@@ -91,6 +91,11 @@ def node_data(store, name):
             bucket.setdefault(field, []).append(value)
         else:
             bucket[field] = value
+    if 'sources' in metadata:
+        # One JSON literal per source (see ir_datasets.v2.sources.describe_sources);
+        # triples are unordered, so each carries its own `order`.
+        metadata['sources'] = sorted((json.loads(x) for x in metadata['sources']),
+                                     key=lambda s: s['order'])
     if not found:
         return None
     return NodeView(store, name, type_, metadata, frozen,

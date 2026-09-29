@@ -212,3 +212,54 @@ code {
   margin: 0;
 }
 
+
+/* Resource pages: how the bytes are obtained (node_resource.html) -- one
+   block per situation (automatic download / manual download / git repo),
+   plus a "Verified Using" block for declared hashes. Each is an icon chip
+   (Tabler's own tinted bg-*-lt/text-* utilities carry the color) beside a
+   title, a one-line explanation, and label/value rows. */
+.acq {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+.acq + .acq {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--tblr-border-color);
+}
+.acq-icon {
+  flex: 0 0 auto;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: var(--tblr-border-radius-lg, .5rem);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.acq-icon svg { width: 1.5rem; height: 1.5rem; }
+.acq-main { flex: 1 1 auto; min-width: 0; }
+.acq-title { font-weight: 600; font-size: 1.05rem; line-height: 1.3; }
+.acq-sub { color: var(--tblr-secondary-color); font-size: .85rem; margin-bottom: .5rem; }
+.acq-rows { display: grid; row-gap: .35rem; margin-top: 0.1rem; }
+.acq-rows + .acq-rows { margin-top: .75rem; }
+.acq-row {
+  display: grid;
+  grid-template-columns: 4.3rem minmax(0, 1fr);
+  column-gap: .75rem;
+  align-items: baseline;
+}
+.acq-label { color: var(--tblr-secondary-color); font-size: .85rem; }
+.acq-steps { margin-top: .5rem; margin-bottom: 1rem; }
+.acq-steps .step-item { height: auto; min-height: 0; flex: 0 0 auto; margin-top: 0; padding-bottom: .1rem; }
+.acq-steps .step-content { position: static; display: block; }
+.acq-steps .step-item:last-child { padding-bottom: 0; }
+.acq-size {
+  font-size: .85rem;
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--tblr-border-color);
+}
+@media (max-width: 575.98px) {
+  .acq-row { grid-template-columns: 1fr; row-gap: 0; }
+}

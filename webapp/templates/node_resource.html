@@ -4,36 +4,98 @@
 {% block content %}
 {{ m.node_header(node) }}
 
+{% set manual_sources = node.metadata.sources | default([]) | selectattr('kind', 'equalto', 'manual') | list %}
 <div class="card">
-  <div class="table-responsive">
-  <table class="table table-vcenter card-table">
-  <tbody>
-  {% if node.metadata.size %}<tr><td class="text-secondary w-1">Size</td><td>{{ '%0.1f'|format(node.metadata.size / 1000000) }} MB</td></tr>{% endif %}
-  {% if node.metadata.repo %}
-  <tr><td class="text-secondary w-1 text-nowrap">Git Repository</td><td>
-    {% if node.metadata.url %}
-    <a href="{{ node.metadata.url }}" target="_blank" rel="noopener"><code>{{ node.metadata.url }}</code></a>
+  <div class="card-body">
+    {% if node.metadata.repo %}
+    <div class="acq acq-git">
+      <div class="acq-icon bg-green-lt text-green">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M7 18a4.6 4.4 0 0 1 0 -9a5 4.5 0 0 1 11 2h1a3.5 3.5 0 0 1 0 7h-1"/><path d="M9 15l3 3l3 -3"/><path d="M12 12l0 9"/></svg>
+      </div>
+      <div class="acq-main">
+        <div class="acq-title">Automatic Download</div>
+        <div class="acq-rows">
+          <div class="acq-row">
+            <span class="acq-label">Repository</span>
+            {% if node.metadata.url %}
+            <a href="{{ node.metadata.url }}" target="_blank" rel="noopener"><code>{{ node.metadata.url }}</code></a>
+            {% else %}
+            <code>{{ node.metadata.repo }}</code>
+            {% endif %}
+          </div>
+          {% if frozen.commit %}
+          <div class="acq-row">
+            <span class="acq-label">Commit</span>
+            <code class="text-break">{{ frozen.commit }}</code>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    {% elif manual_sources %}
+    <div class="acq acq-manual">
+      <div class="acq-icon bg-orange-lt text-orange">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 13a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-6z"/><path d="M11 16a1 1 0 1 0 2 0a1 1 0 0 0 -2 0"/><path d="M8 11v-4a4 4 0 1 1 8 0v4"/></svg>
+      </div>
+      <div class="acq-main">
+        <div class="acq-title">Manual Download Required</div>
+        <div class="acq-sub">This resource can&rsquo;t be downloaded automatically. Follow these instructions for access:</div>
+        {% for src in manual_sources %}
+        {% set full_path = '~/.ir_datasets/external/' ~ src.path %}
+        <div class="steps steps-vertical steps-counter acq-steps">
+          {% for step in src.instructions | default([]) %}
+          {% set lines = step.replace('{path}', full_path).replace('<', '').replace('>', '').split('\n') %}
+          <div class="step-item"><div class="step-content"><div class="fw-bold">{{ lines[0] | urlize(target='_blank', rel='noopener') }}</div>{% for extra in lines[1:] %}<div class="text-secondary">{{ extra | urlize(target='_blank', rel='noopener') }}</div>{% endfor %}</div></div>
+          {% endfor %}
+          <div class="step-item"><div class="step-content"><div class="fw-bold">Place or symlink the file at <code class="text-break">{{ full_path }}</code></div></div></div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
     {% else %}
-    <code>{{ node.metadata.repo }}</code>
+    <div class="acq acq-auto">
+      <div class="acq-icon bg-green-lt text-green">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M7 18a4.6 4.4 0 0 1 0 -9a5 4.5 0 0 1 11 2h1a3.5 3.5 0 0 1 0 7h-1"/><path d="M9 15l3 3l3 -3"/><path d="M12 12l0 9"/></svg>
+      </div>
+      <div class="acq-main">
+        <div class="acq-title">Automatic Download</div>
+        <div class="acq-rows">
+          {% for src in node.metadata.sources %}
+          <div class="acq-row">
+            <span class="acq-label">{{ 'Source' if loop.first else 'Fallback' }}</span>
+            <span>
+              <a href="{{ src.url }}" target="_blank" rel="noopener"><code class="text-break">{{ src.url }}</code></a>
+              {% if src.kind == 'gdrive' %}<span class="badge bg-blue-lt ms-1">Google Drive</span>{% endif %}
+              {% if src.auth %}<span class="badge bg-orange-lt ms-1">requires authentication</span>{% endif %}
+            </span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
     {% endif %}
-  </td></tr>
-  {% if frozen.commit %}
-  <tr><td class="text-secondary w-1 text-nowrap">Commit Hash</td><td>
-    <code>{{ frozen.commit }}</code>
-  </td></tr>
-  {% endif %}
-  {% else %}
-  <tr><td class="text-secondary w-1">Sources</td><td>
-    {% for src in node.metadata.sources %}<div><code>{{ src }}</code></div>{% endfor %}
-  </td></tr>
-  {% endif %}
-  {% if node.hashes %}
-  <tr><td class="text-secondary w-1">Hashes</td><td>
-    {% for algo, digest in node.hashes.items()|sort %}<div><code>{{ algo }}:{{ digest }}</code></div>{% endfor %}
-  </td></tr>
-  {% endif %}
-  </tbody>
-  </table>
+
+    {% if node.hashes %}
+    <div class="acq acq-verify">
+      <div class="acq-icon bg-teal-lt text-teal">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M11.46 20.846a12 12 0 0 1 -7.96 -14.846a12 12 0 0 0 8.5 -3a12 12 0 0 0 8.5 3a12 12 0 0 1 -.09 7.06"/><path d="M15 19l2 2l4 -4"/></svg>
+      </div>
+      <div class="acq-main">
+        <div class="acq-title">Automatic Verification</div>
+        <div class="acq-rows">
+          {% for algo, digest in node.hashes.items()|sort %}
+          <div><code class="text-break">{{ algo }}(file) == '{{ digest }}'</code></div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if node.metadata.size %}
+    <div class="acq-size text-secondary">Size: <strong>{{ node.metadata.size | human_size }}</strong></div>
+    {% endif %}
   </div>
 </div>
 

@@ -282,6 +282,19 @@ app.jinja_env.globals['provider_of'] = lambda name: name.split(':', 1)[0]
 app.jinja_env.globals['frozen_count'] = _frozen_count
 
 
+def _human_size(n):
+    """Decimal byte size, e.g. 1_500_000 -> '1.5 MB'."""
+    n = float(n)
+    for unit in ('B', 'KB', 'MB', 'GB'):
+        if n < 1000:
+            return f'{n:.0f} B' if unit == 'B' else f'{n:.1f} {unit}'
+        n /= 1000
+    return f'{n:.1f} TB'
+
+
+app.jinja_env.filters['human_size'] = _human_size
+
+
 @app.route('/')
 def index():
     """A quiet landing page -- stat cards + provider list only, no filter
@@ -402,6 +415,15 @@ def node(qualified):
         template, node=n, frozen=frozen, triples=triples,
         type_labels=TYPE_LABELS, samples=_pretty_samples(frozen),
         snippet=_python_snippet(n), record_fields=_record_fields(frozen))
+
+
+@app.after_request
+def _no_sniff(response):
+    # Node names can end in data extensions (``.jsonl``, ``.json``, ``.tsv``);
+    # without this, Firefox picks its JSON viewer from the URL's extension
+    # even though the response is text/html.
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    return response
 
 
 @app.errorhandler(404)
