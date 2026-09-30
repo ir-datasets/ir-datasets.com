@@ -15,7 +15,7 @@
     <p class="mb-2">This is the ID of a dataset in an older version of the package.</p>
     {% if replaced_by %}
     <p class="mb-0">You can still load using it, but it automatically maps to its new ID:
-      <a href="{{ node_url(replaced_by[0]) }}"><code>{{ replaced_by[0] }}</code></a></p>
+      <a href="{{ node_url(replaced_by[0]) }}">{{ node_code(replaced_by[0]) }}</a></p>
     {% else %}
     <p class="mb-0"><b>It does not have a known replacement.</b></p>
     {% endif %}

@@ -25,6 +25,7 @@ import sys
 from pathlib import Path
 
 import pyoxigraph as ox
+from markupsafe import Markup, escape
 from flask import Flask, abort, jsonify, render_template, request, url_for
 
 import graph_queries as gq
@@ -207,16 +208,10 @@ def _pretty_samples(frozen):
     return out
 
 
-def _record_fields(frozen):
-    """A table's field names, from its frozen ``record_schema`` string (e.g.
-    ``"GenericDoc(doc_id, text)"``) -- never from a live ``record_type``,
-    which for some providers (hf) means building a handler / peeking a
-    dataset's real columns just to answer "what are the field names"."""
-    schema = frozen.get('record_schema')
-    if not schema:
-        return None
-    m = _SCHEMA_FIELDS_RE.search(schema)
-    return [f.strip() for f in m.group(1).split(',')] if m else None
+def _record_fields(node):
+    """A table's column names, as reported at discovery (``columns`` on the
+    node -- see ``Table.discovery_literals``), ``None`` if it had none."""
+    return node.metadata.get('columns') or None
 
 
 def _python_snippet(node):
@@ -232,7 +227,7 @@ def _python_snippet(node):
             table = node.edge(entity)
             if table is None:
                 continue
-            fields = _record_fields(table._frozen())
+            fields = _record_fields(table)
             lines.append(f"for {singular[entity]} in ds.{entity}:")
             comment = f"  # {singular[entity]}.[{', '.join(fields)}]" if fields else ''
             lines.append(f"    ...{comment}")
@@ -246,6 +241,20 @@ def _python_snippet(node):
     if v2.is_subtype(node.type, v2.RESOURCE):
         return _resource_snippet(node)
     return f"import ir_datasets.v2\nnode = ir_datasets.v2.load({name!r})"
+
+
+def _resource_kind(node):
+    """``'git'``, ``'directory'`` or ``'file'``. The store has no explicit
+    flag: a repo is identified by its ``repo`` field, a directory by a
+    ``directory_manifest`` validation or the ``.dir`` naming convention
+    (irds:gov.dir)."""
+    meta = node.metadata
+    if meta.get('repo'):
+        return 'git'
+    if ((meta.get('validation') or {}).get('type') == 'directory_manifest'
+            or node.qualified_name.endswith('.dir')):
+        return 'directory'
+    return 'file'
 
 
 def _resource_snippet(node):
@@ -263,10 +272,7 @@ def _resource_snippet(node):
                 f"root = res.path()  # clones/fetches the repo"
                 f"{f' at commit {commit[:10]}' if commit else ''}, returns the local directory\n"
                 "# a git repo is a directory tree: there is no res.stream()")
-    # No explicit directory flag in the store: a directory_manifest validation
-    # or the ``.dir`` naming convention (irds:gov.dir) identifies one.
-    is_dir = ((meta.get('validation') or {}).get('type') == 'directory_manifest'
-              or name.endswith('.dir'))
+    is_dir = _resource_kind(node) == 'directory'
     manual_note = ''
     if manual:
         manual_note = "# Note: This resource cannot be downloaded automatically (see above)\n"
@@ -319,6 +325,21 @@ app.jinja_env.globals['node_exists'] = _node_exists
 app.jinja_env.globals['type_label'] = _type_label
 app.jinja_env.globals['type_badge_class'] = _type_badge_class
 app.jinja_env.globals['type_color'] = _type_color
+def _node_code(name, cls=''):
+    """A node's qualified name as ``<code>``, its ``provider:`` prefix in
+    light gray (matching the node page header and the search/provider rows).
+    Never wraps internally (``text-nowrap``): a name is one unit, so a line
+    break falls between names, not inside one."""
+    cls = f'{cls} text-nowrap'.strip()
+    prefix, sep, rest = str(name).partition(':')
+    if not sep:
+        prefix, rest = '', str(name)
+    attr = f' class="{escape(cls)}"' if cls else ''
+    gray = f'<span class="text-secondary">{escape(prefix)}:</span>' if sep else ''
+    return Markup(f'<code{attr}>{gray}{escape(rest)}</code>')
+
+
+app.jinja_env.globals['node_code'] = _node_code
 app.jinja_env.globals['provider_of'] = lambda name: name.split(':', 1)[0]
 app.jinja_env.globals['frozen_count'] = _frozen_count
 
@@ -436,6 +457,33 @@ def provider(prefix):
         type_labels=TYPE_LABELS)
 
 
+def _related(n, triples):
+    """What a node's page links to, all read off its own edges. For a Table:
+    the Resource(s) it's parsed from, any Table it's derived from (plus what
+    filters it), and the Benchmarks that use it. For a Benchmark: the Suites
+    it belongs to. For a Suite: its member Benchmarks and nested Suites."""
+    name = n.qualified_name
+    out = {'sources': [], 'derived_from': [], 'filtered_by': [], 'used_by': [],
+           'suites': [], 'member_benchmarks': [], 'member_suites': []}
+    facet_kinds = {f'irds:{e}' for e in v2.ENTITIES}
+    for subject, kind, obj, other in triples:
+        if subject == name and kind == 'irds:derived_from':
+            target = gq.node_data(store, obj)
+            is_resource = target is not None and v2.is_subtype(target.type, v2.RESOURCE)
+            out['sources' if is_resource else 'derived_from'].append(obj)
+        elif subject == name and kind == 'irds:filtered_by':
+            out['filtered_by'].append(obj)
+        elif obj == name and kind in facet_kinds:
+            out['used_by'].append((subject, kind.split(':', 1)[1]))
+        elif obj == name and kind == 'irds:member':
+            out['suites'].append(subject)
+        elif subject == name and kind == 'irds:member':
+            target = gq.node_data(store, obj)
+            is_suite = target is not None and v2.is_subtype(target.type, v2.SUITE)
+            out['member_suites' if is_suite else 'member_benchmarks'].append(obj)
+    return out
+
+
 @app.route('/n/<path:qualified>')
 def node(qualified):
     n = gq.node_data(store, qualified)
@@ -462,7 +510,8 @@ def node(qualified):
         template, node=n, frozen=frozen, triples=triples, raw_triples=raw_triples,
         derived=derived,
         type_labels=TYPE_LABELS, samples=_pretty_samples(frozen),
-        snippet=_python_snippet(n), record_fields=_record_fields(frozen))
+        snippet=_python_snippet(n), record_fields=_record_fields(n), related=_related(n, triples),
+        resource_kind=_resource_kind(n) if v2.is_subtype(n.type, v2.RESOURCE) else None)
 
 
 @app.after_request

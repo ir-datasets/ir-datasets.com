@@ -26,7 +26,7 @@
   <thead><tr><th>Legacy id</th><th>Resolves to</th></tr></thead>
   <tbody>
   {% for legacy, target in manifest.aliases.items()|sort %}
-  <tr><td><code>{{ legacy }}</code></td><td><a href="{{ node_url(target) }}"><code>{{ target }}</code></a></td></tr>
+  <tr><td><code>{{ legacy }}</code></td><td><a href="{{ node_url(target) }}">{{ node_code(target) }}</a></td></tr>
   {% endfor %}
   </tbody>
   </table>

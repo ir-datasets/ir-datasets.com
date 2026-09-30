@@ -4,13 +4,33 @@
 {% block content %}
 {{ m.node_header(node) }}
 
-{% set sections = [('overview', 'Overview'), ('use-it', 'Use It')]
+{% set validates = [] %}
+{% for subject, kind, object, other in triples if kind == 'irds:validated_by' and object == node.qualified_name %}
+{% set _ = validates.append(subject) %}
+{% endfor %}
+{% set sections = [('overview', 'Overview')]
+  + ([('related', 'Related Nodes')] if derived or validates else [])
+  + [('use-it', 'Use It')]
   + ([('dua', 'Data Usage Agreement')] if node.metadata.dua else [])
   + [('raw-triples', 'Raw Triples')] %}
 {% call m.spy_layout(sections) %}
 {% set manual_sources = node.metadata.sources | default([]) | selectattr('kind', 'equalto', 'manual') | list %}
 <div class="card spy-target" id="overview">
   <div class="card-body">
+    <div class="acq acq-resource">
+      <div class="acq-icon acq-icon-resource">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 2l.117 .007a1 1 0 0 1 .876 .876l.007 .117v4l.005 .15a2 2 0 0 0 1.838 1.844l.157 .006h4l.117 .007a1 1 0 0 1 .876 .876l.007 .117v9a3 3 0 0 1 -2.824 2.995l-.176 .005h-10a3 3 0 0 1 -2.995 -2.824l-.005 -.176v-14a3 3 0 0 1 2.824 -2.995l.176 -.005zm-1 9h-1a2 2 0 0 0 -2 2v3a2 2 0 0 0 2 2h1a2 2 0 0 0 2 -2v-3a2 2 0 0 0 -2 -2m4 0a1 1 0 0 0 -1 1v5a1 1 0 0 0 2 0v-5a1 1 0 0 0 -1 -1m-4 2v3h-1v-3z"/><path d="M19 7h-4l-.001 -4.001z"/></svg>
+      </div>
+      <div class="acq-main">
+        <div class="acq-title">Resource</div>
+        <div class="acq-rows">
+          <div class="acq-row"><span class="acq-label">Type</span><span>{{ {'file': 'File', 'directory': 'Directory', 'git': 'Git repository'}[resource_kind] }}</span></div>
+          {% if node.metadata.size %}<div class="acq-row"><span class="acq-label">Size</span><span>{{ node.metadata.size | human_size }}</span></div>{% endif %}
+{{ m.citation_row(node) }}
+        </div>
+      </div>
+    </div>
+
     {% if node.metadata.repo %}
     <div class="acq acq-git">
       <div class="acq-icon bg-green-lt text-green">
@@ -109,7 +129,7 @@
       <div class="acq-main">
         <div class="acq-title">Partial Validation on First Access</div>
         <div class="acq-sub mb-0">Files and sizes verified against
-          {% if manifest_name %}<a href="{{ node_url(manifest_name[0]) }}"><code>{{ manifest_name[0] }}</code></a>{% else %}its file manifest{% endif %}</div>
+          {% if manifest_name %}<a href="{{ node_url(manifest_name[0]) }}">{{ node_code(manifest_name[0]) }}</a>{% else %}its file manifest{% endif %}</div>
       </div>
     </div>
     {% else %}
@@ -123,23 +143,13 @@
       </div>
     </div>
     {% endif %}
+  </div>
+</div>
 
-    {% if node.metadata.size %}
-    <div class="acq acq-size">
-      <div class="acq-icon bg-secondary-lt text-secondary">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 3l8 4.5l0 9l-8 4.5l-8 -4.5l0 -9l8 -4.5"/><path d="M12 12l8 -4.5"/><path d="M12 12l0 9"/><path d="M12 12l-8 -4.5"/></svg>
-      </div>
-      <div class="acq-main">
-        <div class="acq-title">Size</div>
-        <div class="acq-sub mb-0">{{ node.metadata.size | human_size }}</div>
-      </div>
-    </div>
-    {% endif %}
-
-    {% set validates = [] %}
-    {% for subject, kind, object, other in triples if kind == 'irds:validated_by' and object == node.qualified_name %}
-    {% set _ = validates.append(subject) %}
-    {% endfor %}
+{% if derived or validates %}
+<div class="card mt-3 spy-target" id="related">
+  <div class="card-header"><h3 class="card-title">Related Nodes</h3></div>
+  <div class="card-body">
     {% if validates %}
     <div class="acq acq-manifest">
       <div class="acq-icon acq-icon-resource">
@@ -147,29 +157,32 @@
       </div>
       <div class="acq-main">
         <div class="acq-title">Validation Manifest</div>
-        <div class="acq-sub mb-0">This resource lists the files and sizes used to validate {% for name in validates %}<a href="{{ node_url(name) }}"><code class="text-break">{{ name }}</code></a>{% if not loop.last %}, {% endif %}{% endfor %}</div>
+        <div class="acq-sub">Used to check the files and sizes of these resources.</div>
+        <div>{% for name in validates %}<a href="{{ node_url(name) }}">{{ node_code(name) }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</div>
       </div>
     </div>
     {% endif %}
-{% if derived %}
+    {% if derived %}
     <div class="acq">
       <div class="acq-icon acq-icon-table">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 11h4a1 1 0 0 1 1 1v8a1 1 0 0 1 -1 1h-2a3 3 0 0 1 -2.995 -2.824l-.005 -.176v-6a1 1 0 0 1 1 -1z"/><path d="M21 12v6a3 3 0 0 1 -2.824 2.995l-.176 .005h-6a1 1 0 0 1 -1 -1v-8a1 1 0 0 1 1 -1h8a1 1 0 0 1 1 1z"/><path d="M18 3a3 3 0 0 1 2.995 2.824l.005 .176v2a1 1 0 0 1 -1 1h-8a1 1 0 0 1 -1 -1v-4a1 1 0 0 1 1 -1h6z"/><path d="M9 4v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1v-2a3 3 0 0 1 2.824 -2.995l.176 -.005h2a1 1 0 0 1 1 1z"/></svg>
       </div>
       <div class="acq-main">
         <div class="acq-title">Tables</div>
+        <div class="acq-sub">These tables parse this resource</div>
         <div class="acq-rows">
           {% for d in derived %}
           <div>
-            <span><a href="{{ node_url(d.name) }}"><code class="text-break">{{ d.name }}</code></a>{% if d.type %} <span class="badge badge-sm {{ type_badge_class(d.type) }}">{{ type_label(d.type) }}</span>{% endif %}</span>
+            <span><a href="{{ node_url(d.name) }}">{{ node_code(d.name) }}</a>{% if d.type %} <span class="badge badge-sm {{ type_badge_class(d.type) }}">{{ type_label(d.type) }}</span>{% endif %}</span>
           </div>
           {% endfor %}
         </div>
       </div>
     </div>
-{% endif %}
+    {% endif %}
   </div>
 </div>
+{% endif %}
 
 {{ m.use_it_section(snippet) }}
 

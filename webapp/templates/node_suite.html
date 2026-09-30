@@ -4,23 +4,59 @@
 {% block content %}
 {{ m.node_header(node) }}
 
-{% set sections = [('members', 'Members'), ('raw-triples', 'Raw Triples')] %}
+{% set members = related.member_benchmarks | length + related.member_suites | length %}
+{% set sections = [('overview', 'Overview')]
+  + ([('related', 'Related Nodes')] if members else [])
+  + [('raw-triples', 'Raw Triples')] %}
 {% call m.spy_layout(sections) %}
-<div class="card spy-target" id="members">
-  <div class="card-header"><h3 class="card-title">Members of this suite</h3></div>
-  <div class="table-responsive">
-  <table class="table table-vcenter card-table">
-  <thead><tr><th>Name</th></tr></thead>
-  <tbody>
-  {% for subject, kind, object, other in triples if subject == node.qualified_name and kind == 'irds:member' %}
-  <tr><td><a href="{{ node_url(object) }}"><code>{{ object }}</code></a></td></tr>
-  {% else %}
-  <tr><td class="text-secondary fst-italic">No members in this suite.</td></tr>
-  {% endfor %}
-  </tbody>
-  </table>
+<div class="card spy-target" id="overview">
+  <div class="card-body">
+    <div class="acq">
+      <div class="acq-icon acq-icon-suite">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M7.05 11.293l4.243 -4.243a2 2 0 0 1 2.828 0l2.829 2.83a2 2 0 0 1 0 2.828l-4.243 4.243a2 2 0 0 1 -2.828 0l-2.829 -2.831a2 2 0 0 1 0 -2.828"/><path d="M16.243 9.172l3.086 -.772a1.5 1.5 0 0 0 .697 -2.516l-2.216 -2.217a1.5 1.5 0 0 0 -2.44 .47l-1.248 2.913"/><path d="M9.172 16.243l-.772 3.086a1.5 1.5 0 0 1 -2.516 .697l-2.217 -2.216a1.5 1.5 0 0 1 .47 -2.44l2.913 -1.248"/></svg>
+      </div>
+      <div class="acq-main">
+        <div class="acq-title">Suite</div>
+        <div class="acq-rows">
+          <div class="acq-row"><span class="acq-label">Members</span><span>{{ members }}{% if related.member_suites %} ({{ related.member_benchmarks | length }} benchmarks, {{ related.member_suites | length }} suites){% endif %}</span></div>
+{{ m.citation_row(node) }}
+        </div>
+      </div>
+    </div>
   </div>
 </div>
+
+{% if members %}
+<div class="card mt-3 spy-target" id="related">
+  <div class="card-header"><h3 class="card-title">Related Nodes</h3></div>
+  <div class="card-body">
+    {% if related.member_benchmarks %}
+    <div class="acq">
+      <div class="acq-icon acq-icon-benchmark">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M17 3l4 4l-14 14l-4 -4l14 -14"/><path d="M16 7l-1.5 -1.5"/><path d="M13 10l-1.5 -1.5"/><path d="M10 13l-1.5 -1.5"/><path d="M7 16l-1.5 -1.5"/></svg>
+      </div>
+      <div class="acq-main">
+        <div class="acq-title">Benchmarks</div>
+        <div class="acq-sub">The benchmarks in this suite.</div>
+        <div>{% for name in related.member_benchmarks %}<a href="{{ node_url(name) }}">{{ node_code(name) }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</div>
+      </div>
+    </div>
+    {% endif %}
+    {% if related.member_suites %}
+    <div class="acq">
+      <div class="acq-icon acq-icon-suite">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M7.05 11.293l4.243 -4.243a2 2 0 0 1 2.828 0l2.829 2.83a2 2 0 0 1 0 2.828l-4.243 4.243a2 2 0 0 1 -2.828 0l-2.829 -2.831a2 2 0 0 1 0 -2.828"/><path d="M16.243 9.172l3.086 -.772a1.5 1.5 0 0 0 .697 -2.516l-2.216 -2.217a1.5 1.5 0 0 0 -2.44 .47l-1.248 2.913"/><path d="M9.172 16.243l-.772 3.086a1.5 1.5 0 0 1 -2.516 .697l-2.217 -2.216a1.5 1.5 0 0 1 .47 -2.44l2.913 -1.248"/></svg>
+      </div>
+      <div class="acq-main">
+        <div class="acq-title">Suites</div>
+        <div class="acq-sub">Suites nested within this suite.</div>
+        <div>{% for name in related.member_suites %}<a href="{{ node_url(name) }}">{{ node_code(name) }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
 
 {{ m.triples_section(raw_triples, node.qualified_name) }}
 {% endcall %}

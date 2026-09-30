@@ -7,18 +7,6 @@
 <div class="alert alert-warning">{{ node.metadata.deprecated }}</div>
 {% endif %}
 {% if node.metadata.desc %}<p>{{ node.metadata.desc }}</p>{% endif %}
-{% if node.metadata.citation %}
-<p class="text-secondary">Cite:
-  {% if node_exists(node.metadata.citation) %}
-  <a href="{{ node_url(node.metadata.citation) }}"><code>{{ node.metadata.citation }}</code></a>
-  {% else %}
-  <code>{{ node.metadata.citation }}</code>
-  {% endif %}
-</p>
-{% endif %}
-{% if node.metadata.metrics %}
-<p class="text-secondary">Official measures: {% for m in node.metadata.metrics %}<code>{{ m }}</code>{% if not loop.last %}, {% endif %}{% endfor %}</p>
-{% endif %}
 {% endmacro %}
 
 {% macro triples_section(raw_triples, self_name) %}
@@ -31,9 +19,9 @@
   <tbody>
   {% for subject, predicate, object, kind, graph in raw_triples %}
   <tr>
-    <td class="text-nowrap">{% if subject == self_name %}<code class="text-secondary">{{ subject }}</code>{% else %}<a href="{{ node_url(subject) }}"><code>{{ subject }}</code></a>{% endif %}</td>
+    <td class="text-nowrap">{% if subject == self_name %}<code class="text-secondary">{{ subject }}</code>{% else %}<a href="{{ node_url(subject) }}">{{ node_code(subject) }}</a>{% endif %}</td>
     <td class="text-nowrap"><code>{{ predicate }}</code></td>
-    <td>{% if kind == 'node' %}{% if object == self_name %}<code class="text-secondary">{{ object }}</code>{% else %}<a href="{{ node_url(object) }}"><code>{{ object }}</code></a>{% endif %}{% elif kind == 'type' %}<code>{{ object }}</code>{% else %}<span class="text-break">{{ object }}</span>{% endif %}</td>
+    <td>{% if kind == 'node' %}{% if object == self_name %}<code class="text-secondary">{{ object }}</code>{% else %}<a href="{{ node_url(object) }}">{{ node_code(object) }}</a>{% endif %}{% elif kind == 'type' %}<code>{{ object }}</code>{% else %}<span class="text-break">{{ object }}</span>{% endif %}</td>
     <td class="text-nowrap"><code>{{ graph }}</code></td>
   </tr>
   {% endfor %}
@@ -71,11 +59,11 @@
 {% endmacro %}
 
 {# Scroll-spy layout: a sticky section menu beside the page's cards. Each
-   section is an (id, label) pair naming a ``.spy-target`` card; base.html
-   wires up Bootstrap's ScrollSpy on #spy-nav. Use as
+   section is an (id, label) pair naming a ``.spy-target`` card; the
+   row carries Bootstrap's data-bs-spy attributes (default ScrollSpy). Use as
    ``{% call m.spy_layout(sections) %}...cards...{% endcall %}``. #}
 {% macro spy_layout(sections) %}
-<div class="row g-4">
+<div class="row g-4" data-bs-spy="scroll" data-bs-target="#spy-nav" data-bs-smooth-scroll="true">
   <div class="col-lg-2 d-none d-lg-block">
     <div class="sticky-top spy-menu">
       <nav class="nav nav-vertical nav-pills" id="spy-nav">
@@ -85,4 +73,11 @@
   </div>
   <div class="col-lg-10">{{ caller() }}</div>
 </div>
+{% endmacro %}
+
+{# The node's citation, as a detail row in its first Overview box. #}
+{% macro citation_row(node) %}
+{% if node.metadata.citation %}
+          <div class="acq-row"><span class="acq-label">Citation</span><span>{% if node_exists(node.metadata.citation) %}<a href="{{ node_url(node.metadata.citation) }}">{{ node_code(node.metadata.citation) }}</a>{% else %}<code>{{ node.metadata.citation }}</code>{% endif %}</span></div>
+{% endif %}
 {% endmacro %}

@@ -4,41 +4,71 @@
 {% block content %}
 {{ m.node_header(node) }}
 
-{% set sections = [('facets', 'Facets'), ('use-it', 'Use It'), ('raw-triples', 'Raw Triples')] %}
+{% set sections = [('overview', 'Overview'), ('related', 'Related Nodes'), ('use-it', 'Use It'), ('raw-triples', 'Raw Triples')] %}
 {% call m.spy_layout(sections) %}
-<div class="card spy-target" id="facets">
-  <div class="card-header"><h3 class="card-title">Facets</h3></div>
-  <div class="table-responsive">
-  <table class="table table-vcenter card-table">
-  <thead><tr><th>Entity</th><th>Table</th><th>Count</th></tr></thead>
-  <tbody>
-  {% for entity in ['docs', 'queries', 'qrels', 'scoreddocs', 'docpairs'] %}
-  {% set table = node.edge(entity) %}
-  {% if table is not none %}
-  {# NB: never `{% if table %}` -- Table defines __len__ (record count) but not
-     __bool__, so Python's truthiness protocol falls back to __len__(), and a
-     bare-object `if` here would materialize the table just to test presence. #}
-  {% set count = frozen_count(table) %}
-  <tr>
-    <td><code>{{ entity }}</code></td>
-    <td><a href="{{ node_url(table.qualified_name) }}"><code>{{ table.qualified_name }}</code></a></td>
-    <td>{{ count if count is not none else '—' }}</td>
-  </tr>
-  {% endif %}
-  {% endfor %}
-  </tbody>
-  </table>
+<div class="card spy-target" id="overview">
+  <div class="card-body">
+    <div class="acq">
+      <div class="acq-icon acq-icon-benchmark">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M17 3l4 4l-14 14l-4 -4l14 -14"/><path d="M16 7l-1.5 -1.5"/><path d="M13 10l-1.5 -1.5"/><path d="M10 13l-1.5 -1.5"/><path d="M7 16l-1.5 -1.5"/></svg>
+      </div>
+      <div class="acq-main">
+        <div class="acq-title">Benchmark</div>
+        <div class="acq-rows">
+          {% if node.metadata.metrics %}<div class="acq-row"><span class="acq-label">Measures</span><span>{% for m in node.metadata.metrics %}<code>{{ m }}</code>{% if not loop.last %}, {% endif %}{% endfor %}</span></div>{% endif %}
+          <div class="acq-row"><span class="acq-label">Tables</span><span>{% for entity in ['docs', 'queries', 'qrels', 'scoreddocs', 'docpairs'] if node.edge(entity) is not none %}<code>{{ entity }}</code>{% if not loop.last %}, {% endif %}{% endfor %}</span></div>
+{{ m.citation_row(node) }}
+        </div>
+      </div>
+    </div>
   </div>
 </div>
-<p class="text-secondary mt-2">Counts shown only where <code>freeze --verify</code> has run for
-that table (&mdash; otherwise). This page never materializes a table itself.</p>
+
+<div class="card mt-3 spy-target" id="related">
+  <div class="card-header"><h3 class="card-title">Related Nodes</h3></div>
+  <div class="card-body">
+    <div class="acq">
+      <div class="acq-icon acq-icon-table">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 11h4a1 1 0 0 1 1 1v8a1 1 0 0 1 -1 1h-2a3 3 0 0 1 -2.995 -2.824l-.005 -.176v-6a1 1 0 0 1 1 -1z"/><path d="M21 12v6a3 3 0 0 1 -2.824 2.995l-.176 .005h-6a1 1 0 0 1 -1 -1v-8a1 1 0 0 1 1 -1h8a1 1 0 0 1 1 1z"/><path d="M18 3a3 3 0 0 1 2.995 2.824l.005 .176v2a1 1 0 0 1 -1 1h-8a1 1 0 0 1 -1 -1v-4a1 1 0 0 1 1 -1h6z"/><path d="M9 4v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1v-2a3 3 0 0 1 2.824 -2.995l.176 -.005h2a1 1 0 0 1 1 1z"/></svg>
+      </div>
+      <div class="acq-main">
+        <div class="acq-title">Tables</div>
+        <div class="acq-sub">The tables this benchmark is evaluated with.</div>
+          <div class="acq-rows acq-rows-wide">
+          {% for entity in ['docs', 'queries', 'qrels', 'scoreddocs', 'docpairs'] %}
+          {% set table = node.edge(entity) %}
+          {% if table is not none %}
+          {# NB: never `{% if table %}` -- Table defines __len__ (record count) but not
+             __bool__, so Python's truthiness protocol falls back to __len__(), and a
+             bare-object `if` here would materialize the table just to test presence. #}
+          {% set count = frozen_count(table) %}
+          <div class="acq-row"><span class="acq-label">{{ entity }}</span><span><a href="{{ node_url(table.qualified_name) }}">{{ node_code(table.qualified_name) }}</a>{% if count is not none %} <span class="text-secondary">&middot; {{ '{:,}'.format(count) }}</span>{% endif %}</span></div>
+          {% endif %}
+          {% endfor %}
+          </div>
+      </div>
+    </div>
+    {% if related.suites %}
+    <div class="acq">
+      <div class="acq-icon acq-icon-suite">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M7.05 11.293l4.243 -4.243a2 2 0 0 1 2.828 0l2.829 2.83a2 2 0 0 1 0 2.828l-4.243 4.243a2 2 0 0 1 -2.828 0l-2.829 -2.831a2 2 0 0 1 0 -2.828"/><path d="M16.243 9.172l3.086 -.772a1.5 1.5 0 0 0 .697 -2.516l-2.216 -2.217a1.5 1.5 0 0 0 -2.44 .47l-1.248 2.913"/><path d="M9.172 16.243l-.772 3.086a1.5 1.5 0 0 1 -2.516 .697l-2.217 -2.216a1.5 1.5 0 0 1 .47 -2.44l2.913 -1.248"/></svg>
+      </div>
+      <div class="acq-main">
+        <div class="acq-title">Suites</div>
+        <div class="acq-sub">Suites this benchmark belongs to.</div>
+        <div>{% for name in related.suites %}<a href="{{ node_url(name) }}">{{ node_code(name) }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
 
 {# A Benchmark itself has no derived_from EDGE -- see nodes.Benchmark.structural_edges's
    own docstring: derivation is real at the Table level (a filtered queries/qrels
    table's own derived_from edge), not one level up by convention. Showing
    node.derived_from/node.filter here would describe a relationship with no
    backing edge; that provenance is instead visible on the derived facet's own
-   page (follow a Facets link above), via a real edge. #}
+   page (follow a Tables link above), via a real edge. #}
 
 {{ m.use_it_section(snippet) }}
 

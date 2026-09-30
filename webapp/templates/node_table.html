@@ -5,33 +5,82 @@
 {{ m.node_header(node) }}
 
 {% set sections = [('overview', 'Overview')]
+  + ([('related', 'Related Nodes')] if related.sources or related.derived_from or related.used_by else [])
   + ([('samples', 'Sample Records')] if samples else [])
   + [('use-it', 'Use It'), ('raw-triples', 'Raw Triples')]
   + ([('frozen', 'Frozen Manifest')] if frozen else []) %}
 {% call m.spy_layout(sections) %}
 <div class="card spy-target" id="overview">
-  <div class="table-responsive">
-  <table class="table table-vcenter card-table">
-  <tbody>
-  <tr><td class="text-secondary w-1">Entity</td><td><code>{{ node.entity }}</code></td></tr>
-  {% set count = frozen_count(node) %}
-  <tr><td class="text-secondary w-1">Count</td><td>
-    {{ count if count is not none else '— (not yet verified; run freeze --verify)' }}
-  </td></tr>
-  <tr><td class="text-secondary w-1">Fields</td><td>
-    {% if record_fields %}{% for f in record_fields %}<code>{{ f }}</code>{% if not loop.last %}, {% endif %}{% endfor %}
-    {% else %}&mdash; (not yet verified; run freeze --verify){% endif %}
-  </td></tr>
-  {% if node.metadata.lang %}<tr><td class="text-secondary w-1">Language</td><td><code>{{ node.metadata.lang }}</code></td></tr>{% endif %}
-  {% if node.metadata.defs %}
-  <tr><td class="text-secondary w-1">Relevance levels</td><td>
-    <ul class="mb-0">{% for level, text in node.metadata.defs.items()|sort %}<li><code>{{ level }}</code>: {{ text }}</li>{% endfor %}</ul>
-  </td></tr>
-  {% endif %}
-  </tbody>
-  </table>
+  <div class="card-body">
+    <div class="acq">
+      <div class="acq-icon acq-icon-table">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 11h4a1 1 0 0 1 1 1v8a1 1 0 0 1 -1 1h-2a3 3 0 0 1 -2.995 -2.824l-.005 -.176v-6a1 1 0 0 1 1 -1z"/><path d="M21 12v6a3 3 0 0 1 -2.824 2.995l-.176 .005h-6a1 1 0 0 1 -1 -1v-8a1 1 0 0 1 1 -1h8a1 1 0 0 1 1 1z"/><path d="M18 3a3 3 0 0 1 2.995 2.824l.005 .176v2a1 1 0 0 1 -1 1h-8a1 1 0 0 1 -1 -1v-4a1 1 0 0 1 1 -1h6z"/><path d="M9 4v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1v-2a3 3 0 0 1 2.824 -2.995l.176 -.005h2a1 1 0 0 1 1 1z"/></svg>
+      </div>
+      <div class="acq-main">
+        <div class="acq-title">Table</div>
+        <div class="acq-rows">
+          <div class="acq-row"><span class="acq-label">Entity</span><code>{{ node.entity }}</code></div>
+          {% if node.metadata.lang %}<div class="acq-row"><span class="acq-label">Language</span><code>{{ node.metadata.lang }}</code></div>{% endif %}
+          {% set count = frozen_count(node) %}
+          {% if count is not none %}<div class="acq-row"><span class="acq-label">Count</span><span>{{ '{:,}'.format(count) }}</span></div>{% endif %}
+          {% if record_fields %}<div class="acq-row"><span class="acq-label">Columns</span><span>{% for f in record_fields %}<code>{{ f }}</code>{% if not loop.last %}, {% endif %}{% endfor %}</span></div>{% endif %}
+          {% if node.metadata.defs %}
+          <div class="acq-row"><span class="acq-label">Levels</span>
+            <span>{% for level, text in node.metadata.defs.items()|sort %}<div><code>{{ level }}</code>: {{ text }}</div>{% endfor %}</span></div>
+          {% endif %}
+{{ m.citation_row(node) }}
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
+
+{% if related.sources or related.derived_from or related.used_by %}
+<div class="card mt-3 spy-target" id="related">
+  <div class="card-header"><h3 class="card-title">Related Nodes</h3></div>
+  <div class="card-body">
+    {% if related.sources %}
+    <div class="acq acq-source">
+      <div class="acq-icon acq-icon-resource">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 2l.117 .007a1 1 0 0 1 .876 .876l.007 .117v4l.005 .15a2 2 0 0 0 1.838 1.844l.157 .006h4l.117 .007a1 1 0 0 1 .876 .876l.007 .117v9a3 3 0 0 1 -2.824 2.995l-.176 .005h-10a3 3 0 0 1 -2.995 -2.824l-.005 -.176v-14a3 3 0 0 1 2.824 -2.995l.176 -.005zm-1 9h-1a2 2 0 0 0 -2 2v3a2 2 0 0 0 2 2h1a2 2 0 0 0 2 -2v-3a2 2 0 0 0 -2 -2m4 0a1 1 0 0 0 -1 1v5a1 1 0 0 0 2 0v-5a1 1 0 0 0 -1 -1m-4 2v3h-1v-3z"/><path d="M19 7h-4l-.001 -4.001z"/></svg>
+      </div>
+      <div class="acq-main">
+        <div class="acq-title">Resources</div>
+        <div class="acq-sub">The files this table is parsed from.</div>
+        <div>{% for name in related.sources %}<a href="{{ node_url(name) }}">{{ node_code(name) }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if related.derived_from %}
+    <div class="acq acq-derived">
+      <div class="acq-icon acq-icon-table">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 11h4a1 1 0 0 1 1 1v8a1 1 0 0 1 -1 1h-2a3 3 0 0 1 -2.995 -2.824l-.005 -.176v-6a1 1 0 0 1 1 -1z"/><path d="M21 12v6a3 3 0 0 1 -2.824 2.995l-.176 .005h-6a1 1 0 0 1 -1 -1v-8a1 1 0 0 1 1 -1h8a1 1 0 0 1 1 1z"/><path d="M18 3a3 3 0 0 1 2.995 2.824l.005 .176v2a1 1 0 0 1 -1 1h-8a1 1 0 0 1 -1 -1v-4a1 1 0 0 1 1 -1h6z"/><path d="M9 4v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1v-2a3 3 0 0 1 2.824 -2.995l.176 -.005h2a1 1 0 0 1 1 1z"/></svg>
+      </div>
+      <div class="acq-main">
+        <div class="acq-title">Derived From</div>
+        <div class="acq-sub">The table(s) this one is derived from{% if related.filtered_by %}, and what filters it{% endif %}.</div>
+        <div>{% for name in related.derived_from %}<a href="{{ node_url(name) }}">{{ node_code(name) }}</a>{% if not loop.last %}, {% endif %}{% endfor %}{% if related.filtered_by %}, filtered by {% for name in related.filtered_by %}<a href="{{ node_url(name) }}">{{ node_code(name) }}</a>{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}</div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if related.used_by %}
+    <div class="acq acq-used-by">
+      <div class="acq-icon acq-icon-benchmark">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M17 3l4 4l-14 14l-4 -4l14 -14"/><path d="M16 7l-1.5 -1.5"/><path d="M13 10l-1.5 -1.5"/><path d="M10 13l-1.5 -1.5"/><path d="M7 16l-1.5 -1.5"/></svg>
+      </div>
+      <div class="acq-main">
+        <div class="acq-title">Benchmarks</div>
+        <div class="acq-sub">Benchmarks that use this table as a component.</div>
+        <div>{% for name, facet in related.used_by %}<a href="{{ node_url(name) }}">{{ node_code(name) }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
 
 {% if samples %}
 <div class="card mt-3 spy-target" id="samples">

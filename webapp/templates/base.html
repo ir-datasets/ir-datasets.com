@@ -59,18 +59,6 @@
 <script src="{{ url_for('static', filename='nav.js') }}"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <script>document.querySelectorAll('pre code.language-python').forEach(function (el) { hljs.highlightElement(el); });</script>
-<script>
-(function () {
-  var nav = document.getElementById('spy-nav');
-  if (!nav || !window.tabler) return;
-  new tabler.ScrollSpy(document.body, {target: '#spy-nav'});
-  // Overview jumps to the very top of the page -- title and all -- not to its card.
-  nav.firstElementChild.addEventListener('click', function (e) {
-    e.preventDefault();
-    window.scrollTo({top: 0, behavior: 'smooth'});
-  });
-})();
-</script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

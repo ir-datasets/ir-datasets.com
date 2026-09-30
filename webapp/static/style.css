@@ -244,7 +244,7 @@ code {
 .acq-icon svg { width: 1.5rem; height: 1.5rem; }
 .acq-main { flex: 1 1 auto; min-width: 0; }
 .acq-title { font-weight: 600; font-size: 1.05rem; line-height: 1.3; }
-.acq-sub { color: var(--tblr-secondary-color); font-size: .85rem; margin-bottom: .5rem; }
+.acq-sub { color: var(--tblr-secondary-color); font-size: .85rem; }
 .acq-rows { display: grid; row-gap: .35rem; margin-top: 0.1rem; }
 .acq-rows + .acq-rows { margin-top: .75rem; }
 .acq-row {
@@ -273,4 +273,16 @@ pre code.hljs { background: transparent; padding: 0; }
 .acq-icon-resource {
   background: color-mix(in srgb, var(--cat-resource) 15%, transparent);
   color: var(--cat-resource);
+}
+.acq-icon-benchmark {
+  background: color-mix(in srgb, var(--cat-benchmark) 15%, transparent);
+  color: var(--cat-benchmark);
+}
+.acq-icon-suite {
+  background: color-mix(in srgb, var(--cat-suite) 15%, transparent);
+  color: var(--cat-suite);
+}
+/* rows whose labels are longer than the default 4.3rem column (e.g. "scoreddocs") */
+@media (min-width: 576px) {
+  .acq-rows-wide .acq-row { grid-template-columns: 6rem minmax(0, 1fr); }
 }
