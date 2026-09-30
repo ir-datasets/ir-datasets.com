@@ -23,7 +23,7 @@
 
     <p>Datasets are organized into four types:</p>
     <p class="ms-4"><a href="{{ url_for('search', type='irds:Resource') }}" class="badge badge-cat-resource">Resources</a> are raw sources, like downloadable files. Example: <a href="/n/irds:cranfield.tar.gz"><code>irds:cranfield.tar.gz</code></a></p>
-    <p class="ms-4"><a href="{{ url_for('search', type='irds:Table') }}" class="badge badge-cat-table">Tables</a> parse <strong class="text-cat-resource">Resources</strong> into records with the same structure. Example: <a href="/n/irds:msmarco-passage"><code>irds:msmarco-passage</code></a></p>
+    <p class="ms-4"><a href="{{ url_for('search', type='irds:Table') }}" class="badge badge-cat-table">Tables</a> parse <strong class="text-cat-resource">Resources</strong> into records with a consistent structure. Example: <a href="/n/irds:msmarco-passage"><code>irds:msmarco-passage</code></a></p>
     <p class="ms-4"><a href="{{ url_for('search', type='irds:Benchmark') }}" class="badge badge-cat-benchmark">Benchmarks</a> are combinations of <strong class="text-cat-table">Tables</strong> to evaluate a specific task. Example: <a href="/n/irds:antique-test"><code>irds:antique-test</code></a></p>
     <p class="ms-4"><a href="{{ url_for('search', type='irds:Suite') }}" class="badge badge-cat-suite">Suites</a> are collections of <strong class="text-cat-benchmark">Benchmarks</strong> that are evaluated together. Example: <a href="/n/irds:bright"><code>irds:bright</code></a></p>
 
