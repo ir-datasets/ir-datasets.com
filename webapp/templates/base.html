@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>{% block title %}ir-datasets.com{% endblock %}</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1/dist/css/tabler.min.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
 </head>
 <body>
@@ -56,6 +57,20 @@
 <script src="https://cdn.jsdelivr.net/npm/@tabler/core@1/dist/js/tabler.min.js"></script>
 <script src="{{ url_for('static', filename='browse.js') }}"></script>
 <script src="{{ url_for('static', filename='nav.js') }}"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>document.querySelectorAll('pre code.language-python').forEach(function (el) { hljs.highlightElement(el); });</script>
+<script>
+(function () {
+  var nav = document.getElementById('spy-nav');
+  if (!nav || !window.tabler) return;
+  new tabler.ScrollSpy(document.body, {target: '#spy-nav'});
+  // Overview jumps to the very top of the page -- title and all -- not to its card.
+  nav.firstElementChild.addEventListener('click', function (e) {
+    e.preventDefault();
+    window.scrollTo({top: 0, behavior: 'smooth'});
+  });
+})();
+</script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

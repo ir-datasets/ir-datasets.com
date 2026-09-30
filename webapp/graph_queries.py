@@ -132,6 +132,27 @@ def triples_of(store, name):
     return rows
 
 
+def raw_triples_of(store, name):
+    """Every triple with ``name`` as subject (type, literals, edges alike) plus
+    every edge pointing at it, as ``(subject, predicate, object, object_kind, graph)``
+    where ``object_kind`` is ``'node'`` (a link), ``'type'`` or ``'literal'``."""
+    self_iri = node_iri(name)
+    rows = []
+    for quad in store.quads_for_pattern(self_iri, None, None):
+        if quad.predicate == RDF_TYPE:
+            rows.append((name, 'rdf:type', type_name(quad.object), 'type', graph_name(quad.graph_name)))
+        elif (kind := edge_kind(quad.predicate)) is not None:
+            rows.append((name, kind, node_name(quad.object), 'node', graph_name(quad.graph_name)))
+        elif (field := meta_field(quad.predicate)) is not None:
+            rows.append((name, field, quad.object.value, 'literal', graph_name(quad.graph_name)))
+    for quad in store.quads_for_pattern(None, None, self_iri):
+        kind = edge_kind(quad.predicate)
+        if kind is not None:
+            rows.append((node_name(quad.subject), kind, name, 'node', graph_name(quad.graph_name)))
+    rows.sort(key=lambda r: (r[0] != name, r[1], r[2]))
+    return rows
+
+
 #: (name, type, provider) for every materialized node, sorted by name *with
 #: its provider prefix ignored* (``irds:antique-docs`` sorts next to
 #: ``hf:neuclir/csl``'s neighbors by "antique-docs" vs. "neuclir/csl", not

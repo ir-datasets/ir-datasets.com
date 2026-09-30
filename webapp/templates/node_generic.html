@@ -7,7 +7,10 @@
 site has a dedicated template for yet &mdash; likely a third-party provider's
 own vocabulary. Showing its raw metadata and edges instead.</p>
 
-<div class="card">
+{% set sections = [('overview', 'Overview'), ('raw-triples', 'Raw Triples')]
+  + ([('frozen', 'Frozen Manifest')] if frozen else []) %}
+{% call m.spy_layout(sections) %}
+<div class="card spy-target" id="overview">
   <div class="table-responsive">
   <table class="table table-vcenter card-table">
   <tbody>
@@ -19,6 +22,7 @@ own vocabulary. Showing its raw metadata and edges instead.</p>
   </div>
 </div>
 
-{{ m.triples_section(triples, node.qualified_name) }}
+{{ m.triples_section(raw_triples, node.qualified_name) }}
 {{ m.frozen_section(frozen) }}
+{% endcall %}
 {% endblock %}

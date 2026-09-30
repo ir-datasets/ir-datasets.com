@@ -8,7 +8,9 @@
 {% set _ = replaced_by.append(object) %}
 {% endfor %}
 
-<div class="card">
+{% set sections = [('overview', 'Overview'), ('raw-triples', 'Raw Triples')] %}
+{% call m.spy_layout(sections) %}
+<div class="card spy-target" id="overview">
   <div class="card-body">
     <p class="mb-2">This is the ID of a dataset in an older version of the package.</p>
     {% if replaced_by %}
@@ -20,5 +22,6 @@
   </div>
 </div>
 
-{{ m.triples_section(triples, node.qualified_name) }}
+{{ m.triples_section(raw_triples, node.qualified_name) }}
+{% endcall %}
 {% endblock %}

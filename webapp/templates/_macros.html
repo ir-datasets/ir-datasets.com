@@ -21,16 +21,24 @@
 {% endif %}
 {% endmacro %}
 
-{% macro triples_section(triples, self_name) %}
-{% if triples %}
-<div class="card mt-3">
-  <div class="card-header"><h3 class="card-title">Triples</h3></div>
-  <div class="triples-grid">
-  {% for subject, kind, object, other in triples %}
-  <span class="triple-node triple-subject">{% if subject == self_name %}<code class="text-secondary">{{ subject }}</code>{% else %}<a href="{{ node_url(subject) }}"><code>{{ subject }}</code></a>{% endif %}</span>
-  <span class="triple-edge"><span class="triple-edge-line"></span><span class="triple-edge-label"><code>{{ kind }}</code></span><span class="triple-edge-line"></span><span class="triple-edge-arrowhead"></span></span>
-  <span class="triple-node">{% if object == self_name %}<code class="text-secondary">{{ object }}</code>{% else %}<a href="{{ node_url(object) }}"><code>{{ object }}</code></a>{% endif %}</span>
+{% macro triples_section(raw_triples, self_name) %}
+{% if raw_triples %}
+<div class="card mt-3 spy-target" id="raw-triples">
+  <div class="card-header"><h3 class="card-title">Raw Triples</h3></div>
+  <div class="table-responsive">
+  <table class="table table-vcenter card-table table-sm">
+  <thead><tr><th class="w-1 text-nowrap">Subject</th><th class="w-1 text-nowrap">Predicate</th><th>Object</th><th class="w-1 text-nowrap">Graph</th></tr></thead>
+  <tbody>
+  {% for subject, predicate, object, kind, graph in raw_triples %}
+  <tr>
+    <td class="text-nowrap">{% if subject == self_name %}<code class="text-secondary">{{ subject }}</code>{% else %}<a href="{{ node_url(subject) }}"><code>{{ subject }}</code></a>{% endif %}</td>
+    <td class="text-nowrap"><code>{{ predicate }}</code></td>
+    <td>{% if kind == 'node' %}{% if object == self_name %}<code class="text-secondary">{{ object }}</code>{% else %}<a href="{{ node_url(object) }}"><code>{{ object }}</code></a>{% endif %}{% elif kind == 'type' %}<code>{{ object }}</code>{% else %}<span class="text-break">{{ object }}</span>{% endif %}</td>
+    <td class="text-nowrap"><code>{{ graph }}</code></td>
+  </tr>
   {% endfor %}
+  </tbody>
+  </table>
   </div>
 </div>
 {% endif %}
@@ -38,7 +46,7 @@
 
 {% macro frozen_section(frozen) %}
 {% if frozen %}
-<div class="card mt-3">
+<div class="card mt-3 spy-target" id="frozen">
   <div class="card-header"><h3 class="card-title">Frozen manifest row</h3></div>
   <div class="table-responsive">
   <table class="table table-vcenter card-table">
@@ -53,4 +61,28 @@
   </div>
 </div>
 {% endif %}
+{% endmacro %}
+
+{% macro use_it_section(snippet) %}
+<div class="card mt-3 spy-target" id="use-it">
+  <div class="card-header"><h3 class="card-title">Use It</h3></div>
+  <pre class="bg-secondary-lt p-3 overflow-auto mb-0" style="border-radius: 0"><code class="language-python">{{ snippet }}</code></pre>
+</div>
+{% endmacro %}
+
+{# Scroll-spy layout: a sticky section menu beside the page's cards. Each
+   section is an (id, label) pair naming a ``.spy-target`` card; base.html
+   wires up Bootstrap's ScrollSpy on #spy-nav. Use as
+   ``{% call m.spy_layout(sections) %}...cards...{% endcall %}``. #}
+{% macro spy_layout(sections) %}
+<div class="row g-4">
+  <div class="col-lg-2 d-none d-lg-block">
+    <div class="sticky-top spy-menu">
+      <nav class="nav nav-vertical nav-pills" id="spy-nav">
+        {% for id, label in sections %}<a class="nav-link" href="#{{ id }}">{{ label }}</a>{% endfor %}
+      </nav>
+    </div>
+  </div>
+  <div class="col-lg-10">{{ caller() }}</div>
+</div>
 {% endmacro %}

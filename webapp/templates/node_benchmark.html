@@ -4,7 +4,9 @@
 {% block content %}
 {{ m.node_header(node) }}
 
-<div class="card">
+{% set sections = [('facets', 'Facets'), ('use-it', 'Use It'), ('raw-triples', 'Raw Triples')] %}
+{% call m.spy_layout(sections) %}
+<div class="card spy-target" id="facets">
   <div class="card-header"><h3 class="card-title">Facets</h3></div>
   <div class="table-responsive">
   <table class="table table-vcenter card-table">
@@ -38,10 +40,8 @@ that table (&mdash; otherwise). This page never materializes a table itself.</p>
    backing edge; that provenance is instead visible on the derived facet's own
    page (follow a Facets link above), via a real edge. #}
 
-<div class="card mt-3">
-  <div class="card-header"><h3 class="card-title">Try it</h3></div>
-  <div class="card-body"><pre class="bg-dark-lt rounded p-3 overflow-auto mb-0">{{ snippet }}</pre></div>
-</div>
+{{ m.use_it_section(snippet) }}
 
-{{ m.triples_section(triples, node.qualified_name) }}
+{{ m.triples_section(raw_triples, node.qualified_name) }}
+{% endcall %}
 {% endblock %}

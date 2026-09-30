@@ -240,10 +240,51 @@ def _python_snippet(node):
     if v2.is_subtype(node.type, v2.TABLE):
         return (f"import ir_datasets.v2\n"
                 f"table = ir_datasets.v2.load({name!r})\n"
-                f"len(table)             # record count\n"
-                f"table[0]               # first record\n"
+                f"len(table)  # record count\n"
+                f"table[0]  # first record\n"
                 f"for record in table: ...")
+    if v2.is_subtype(node.type, v2.RESOURCE):
+        return _resource_snippet(node)
     return f"import ir_datasets.v2\nnode = ir_datasets.v2.load({name!r})"
+
+
+def _resource_snippet(node):
+    """``Resource.path()``/``.stream()`` usage, varied by how the resource is
+    acquired: git repo / directory tree (no ``stream()``), manual download,
+    authenticated download, or a plain downloadable file."""
+    name = node.qualified_name
+    meta = node.metadata
+    sources = meta.get('sources') or []
+    manual = [x for x in sources if x.get('kind') == 'manual']
+    head = f"import ir_datasets.v2\nres = ir_datasets.v2.load({name!r})\n"
+    if meta.get('repo'):
+        commit = node._frozen().get('commit')
+        return (head +
+                f"root = res.path()  # clones/fetches the repo"
+                f"{f' at commit {commit[:10]}' if commit else ''}, returns the local directory\n"
+                "# a git repo is a directory tree: there is no res.stream()")
+    # No explicit directory flag in the store: a directory_manifest validation
+    # or the ``.dir`` naming convention (irds:gov.dir) identifies one.
+    is_dir = ((meta.get('validation') or {}).get('type') == 'directory_manifest'
+              or name.endswith('.dir'))
+    manual_note = ''
+    if manual:
+        manual_note = "# Note: This resource cannot be downloaded automatically (see above)\n"
+    if is_dir:
+        return (head + manual_note +
+                "root = res.path()  # root of the directory tree")
+    if manual:
+        return (head + manual_note +
+                "res.path()  # validated on first access\n"
+                "with res.stream() as f:\n"
+                "    f.readline()")
+    auth = any(x.get('auth') for x in sources)
+    return (head +
+            ("# requires authentication: see the source above for the credentials it expects\n"
+             if auth else '') +
+            "res.path()  # downloads (and validates) if needed, returns the local path\n"
+            "with res.stream() as f:  # or read it without caring where it lives\n"
+            "    f.readline()")
 
 
 def _node_url(name):
@@ -399,6 +440,7 @@ def provider(prefix):
 def node(qualified):
     n = gq.node_data(store, qualified)
     triples = gq.triples_of(store, qualified) if n is not None else []
+    raw_triples = gq.raw_triples_of(store, qualified) if n is not None else []
     if n is None:
         # Not in the materialized snapshot (most likely a fresh hf: repo the
         # last build's crawl missed, or predates it) -- resolve it live, same
@@ -411,8 +453,14 @@ def node(qualified):
     template = (TEMPLATE_BY_EXACT_TYPE.get(n.type)
                 or TEMPLATE_BY_TYPE.get(category, 'node_generic.html'))
     frozen = n._frozen()
+    derived = []
+    for subject, kind, obj, other in triples:
+        if kind == 'irds:derived_from' and obj == qualified:
+            o = gq.node_data(store, subject)
+            derived.append({'name': subject, 'type': o.type if o else None})
     return render_template(
-        template, node=n, frozen=frozen, triples=triples,
+        template, node=n, frozen=frozen, triples=triples, raw_triples=raw_triples,
+        derived=derived,
         type_labels=TYPE_LABELS, samples=_pretty_samples(frozen),
         snippet=_python_snippet(n), record_fields=_record_fields(frozen))
 
