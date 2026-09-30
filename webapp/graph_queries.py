@@ -19,7 +19,7 @@ from rdf_schema import (
 #: Fields that were emitted once per list element (see registry.row_triples)
 #: -- collect repeated (name, field) triples back into a list instead of
 #: letting the last one silently win.
-_LIST_FIELDS = {'hashes', 'sources', 'metrics'}
+_LIST_FIELDS = {'sources', 'metrics'}
 #: Fields whose single literal is a JSON blob of a dict, decoded back to one
 #: (`samples_json` -> `samples`, `defs_json` -> `defs`).
 _JSON_SUFFIX = '_json'
@@ -28,7 +28,7 @@ _JSON_SUFFIX = '_json'
 class NodeView:
     """A stand-in for a live ``Node`` object, built entirely from the store --
     exposes the same attributes the templates read (``qualified_name``,
-    ``type``, ``metadata``, ``entity``, ``hashes``, ``_frozen()``) without
+    ``type``, ``metadata``, ``entity``, ``_frozen()``) without
     ever importing/resolving the real node."""
 
     def __init__(self, store, name, type_, metadata, frozen, entity=None):
@@ -36,10 +36,6 @@ class NodeView:
         self.type = type_
         self.metadata = metadata
         self.entity = entity
-        self.hashes = {}
-        for spec in metadata.get('hashes', []):
-            algo, _, digest = spec.partition(':')
-            self.hashes[algo] = digest
         self._frozen_row = frozen
         self._store = store
 
