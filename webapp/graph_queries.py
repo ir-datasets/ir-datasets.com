@@ -19,7 +19,7 @@ from rdf_schema import (
 #: Fields that were emitted once per list element (see registry.row_triples)
 #: -- collect repeated (name, field) triples back into a list instead of
 #: letting the last one silently win.
-_LIST_FIELDS = {'sources', 'metrics'}
+_LIST_FIELDS = {'sources', 'metrics', 'citation', 'license'}
 #: Fields whose single literal is a JSON blob of a dict, decoded back to one
 #: (`samples_json` -> `samples`, `defs_json` -> `defs`).
 _JSON_SUFFIX = '_json'
@@ -87,6 +87,11 @@ def node_data(store, name):
             bucket.setdefault(field, []).append(value)
         else:
             bucket[field] = value
+    if 'citation' in metadata:
+        # A single literal may hold several ';'-separated citations
+        # (e.g. 'dblp:conf/clef/X; dblp:conf/eacl/Y'): split them apart.
+        metadata['citation'] = [c.strip() for raw in metadata['citation']
+                                for c in str(raw).split(';') if c.strip()]
     if 'sources' in metadata:
         # One JSON literal per source (see ir_datasets.v2.sources.describe_sources);
         # triples are unordered, so each carries its own `order`.

@@ -11,6 +11,7 @@ own vocabulary. Showing its raw metadata and edges instead.</p>
   + ([('frozen', 'Frozen Manifest')] if frozen else []) %}
 {% call m.spy_layout(sections) %}
 <div class="card spy-target" id="overview">
+  {% if node.metadata.desc %}<div class="card-body border-bottom">{{ m.desc_para(node) }}</div>{% endif %}
   <div class="table-responsive">
   <table class="table table-vcenter card-table">
   <tbody>

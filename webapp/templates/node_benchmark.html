@@ -8,16 +8,17 @@
 {% call m.spy_layout(sections) %}
 <div class="card spy-target" id="overview">
   <div class="card-body">
+{{ m.desc_para(node) }}
     <div class="acq">
-      <div class="acq-icon acq-icon-benchmark">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M17 3l4 4l-14 14l-4 -4l14 -14"/><path d="M16 7l-1.5 -1.5"/><path d="M13 10l-1.5 -1.5"/><path d="M10 13l-1.5 -1.5"/><path d="M7 16l-1.5 -1.5"/></svg>
-      </div>
+{{ m.overview_icon() }}
       <div class="acq-main">
-        <div class="acq-title">Benchmark</div>
+        <div class="acq-title">Overview</div>
         <div class="acq-rows">
+{{ m.type_row(node) }}
           {% if node.metadata.metrics %}<div class="acq-row"><span class="acq-label">Measures</span><span>{% for m in node.metadata.metrics %}<code>{{ m }}</code>{% if not loop.last %}, {% endif %}{% endfor %}</span></div>{% endif %}
           <div class="acq-row"><span class="acq-label">Tables</span><span>{% for entity in ['docs', 'queries', 'qrels', 'scoreddocs', 'docpairs'] if node.edge(entity) is not none %}<code>{{ entity }}</code>{% if not loop.last %}, {% endif %}{% endfor %}</span></div>
 {{ m.citation_row(node) }}
+{{ m.license_row(node) }}
         </div>
       </div>
     </div>
@@ -25,7 +26,6 @@
 </div>
 
 <div class="card mt-3 spy-target" id="related">
-  <div class="card-header"><h3 class="card-title">Related Nodes</h3></div>
   <div class="card-body">
     <div class="acq">
       <div class="acq-icon acq-icon-table">

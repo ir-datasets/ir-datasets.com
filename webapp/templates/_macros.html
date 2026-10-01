@@ -6,7 +6,6 @@
 {% if node.metadata.deprecated %}
 <div class="alert alert-warning">{{ node.metadata.deprecated }}</div>
 {% endif %}
-{% if node.metadata.desc %}<p>{{ node.metadata.desc }}</p>{% endif %}
 {% endmacro %}
 
 {% macro triples_section(raw_triples, self_name) %}
@@ -39,7 +38,7 @@
   <div class="table-responsive">
   <table class="table table-vcenter card-table">
   <tbody>
-  {% for key in ['count', 'content_sha256', 'hash_scheme', 'record_schema'] %}
+  {% for key in ['count', 'score_counts', 'content_sha256', 'hash_scheme', 'record_schema'] %}
   {% if key in frozen %}
   <tr><td class="text-secondary w-1">{{ key }}</td><td><code>{{ frozen[key] }}</code></td></tr>
   {% endif %}
@@ -75,9 +74,43 @@
 </div>
 {% endmacro %}
 
-{# The node's citation, as a detail row in its first Overview box. #}
+{# The node's citation(s), as a detail row in its first Overview box. A node
+   may cite several papers (``citation`` is a list in the graph); a ``dblp:``
+   key links to its official dblp.org record. #}
 {% macro citation_row(node) %}
 {% if node.metadata.citation %}
-          <div class="acq-row"><span class="acq-label">Citation</span><span>{% if node_exists(node.metadata.citation) %}<a href="{{ node_url(node.metadata.citation) }}">{{ node_code(node.metadata.citation) }}</a>{% else %}<code>{{ node.metadata.citation }}</code>{% endif %}</span></div>
+          <div class="acq-row"><span class="acq-label">Citation</span><span>{% for c in node.metadata.citation %}{% if not loop.first %}<br>{% endif %}{% if c.startswith('dblp:') %}<a href="https://dblp.org/rec/{{ c[5:] }}.html?view=bibtex" target="_blank" rel="noopener"><code>{{ c }}</code></a>{% elif node_exists(c) %}<a href="{{ node_url(c) }}">{{ node_code(c) }}</a>{% else %}<code>{{ c }}</code>{% endif %}{% endfor %}</span></div>
 {% endif %}
 {% endmacro %}
+
+{# The node's license(s): ``spdx:<id>`` links to the SPDX license page (showing
+   just the id), an http(s) URL (custom terms) links to itself, anything else is
+   shown as plain text. #}
+{% macro license_row(node) %}
+{% if node.metadata.license %}
+          <div class="acq-row"><span class="acq-label">License</span><span>{% for l in node.metadata.license %}{% if not loop.first %}<br>{% endif %}{% if l.startswith('spdx:') %}<a href="https://spdx.org/licenses/{{ l[5:] }}.html" target="_blank" rel="noopener"><code>{{ l[5:] }}</code></a>{% elif l.startswith('http://') or l.startswith('https://') %}<a href="{{ l }}" target="_blank" rel="noopener">{{ l }}</a>{% else %}<code>{{ l }}</code>{% endif %}{% endfor %}</span></div>
+{% endif %}
+{% endmacro %}
+
+{# The node's description: plain text at the top of its Overview card. #}
+{% macro desc_para(node) %}{% if node.metadata.desc %}
+    <p>{{ node.metadata.desc }}</p>
+{% endif %}{% endmacro %}
+
+{# The generic (gray) box icon leading every node's Overview box. #}
+{% macro overview_icon() %}
+      <div class="acq-icon bg-secondary-lt text-secondary">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 3l8 4.5v9l-8 4.5l-8 -4.5v-9l8 -4.5"/><path d="M12 12l8 -4.5"/><path d="M12 12v9"/><path d="M12 12l-8 -4.5"/></svg>
+      </div>
+{% endmacro %}
+
+{# First row of the Overview box: the node's type, as its badge. #}
+{% macro type_row(node) %}
+          <div class="acq-row"><span class="acq-label">Type</span><span><span class="badge badge-sm {{ type_badge_class(node.type) }}">{{ type_label(node.type) }}</span></span></div>
+{% endmacro %}
+
+{# A language literal (``lang2:zh`` ISO 639-1, ``lang3:zho`` ISO 639-3) as a link
+   to the Library of Congress's language record, showing just the code. LOC's
+   three-letter vocabulary is ISO 639-2, so a 639-3-only code links to a page
+   that doesn't exist there; anything not of that form is shown as plain text. #}
+{% macro language_link(value) %}{% if value.startswith('lang2:') %}<a href="http://id.loc.gov/vocabulary/iso639-1/{{ value[6:] }}" target="_blank" rel="noopener"><code>{{ value[6:] }}</code></a>{% elif value.startswith('lang3:') %}<a href="http://id.loc.gov/vocabulary/iso639-2/{{ value[6:] }}" target="_blank" rel="noopener"><code>{{ value[6:] }}</code></a>{% else %}<code>{{ value }}</code>{% endif %}{% endmacro %}

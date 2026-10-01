@@ -45,7 +45,7 @@ XSD_INTEGER = ox.NamedNode('http://www.w3.org/2001/XMLSchema#integer')
 #: not descriptive metadata -- kept in their own bucket so ``node_data()``
 #: can hand templates the same shape ``Node._frozen()`` always did.
 FROZEN_FIELDS = {'count', 'content_sha256', 'hash_scheme', 'record_schema',
-                 'samples', 'commit', 'hashes_confirmed'}
+                 'samples', 'commit', 'hashes_confirmed', 'score_counts'}
 
 
 def node_iri(name):

@@ -12,6 +12,7 @@
 {% call m.spy_layout(sections) %}
 <div class="card spy-target" id="overview">
   <div class="card-body">
+{{ m.desc_para(node) }}
     <p class="mb-2">This is the ID of a dataset in an older version of the package.</p>
     {% if replaced_by %}
     <p class="mb-0">You can still load using it, but it automatically maps to its new ID:

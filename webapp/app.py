@@ -196,16 +196,45 @@ def _frozen_count(table):
     return table._frozen().get('count')
 
 
-def _pretty_samples(frozen):
-    """Frozen sample rows are canonical JSON *strings*; re-parse for display."""
+#: Longest cell text shown in the sample-records table; the rest is elided
+#: (a web document can be megabytes).
+_SAMPLE_CELL_MAX = 500
+
+
+def _sample_cell(value):
     import json
-    out = []
+    if value is None:
+        return ''
+    text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
+    if len(text) <= _SAMPLE_CELL_MAX:
+        return text
+    return f'{text[:_SAMPLE_CELL_MAX]}\u2026 [{len(text) - _SAMPLE_CELL_MAX:,} more characters]'
+
+
+def _pretty_samples(frozen, fields=()):
+    """Frozen sample rows are canonical JSON *strings* (keys sorted); re-parse
+    into ``(columns, rows)`` for a table: columns follow the table's declared
+    field order (``fields``) with any extra keys after, rows are
+    ``(record index, [cell text, ...])``. Where the sampled indices skip, a
+    ``(None, None)`` row marks the gap. ``([], [])`` when there are none."""
+    import json
+    records = []
     for idx, line in sorted(frozen.get('samples', {}).items(), key=lambda kv: int(kv[0])):
         try:
-            out.append((idx, json.dumps(json.loads(line), indent=2, ensure_ascii=False)))
+            record = json.loads(line)
         except (TypeError, ValueError):
-            out.append((idx, line))
-    return out
+            record = None
+        records.append((idx, record if isinstance(record, dict) else {'record': line}))
+    present = {k for _, r in records for k in r}
+    columns = [f for f in fields if f in present]
+    columns += sorted(present - set(columns))
+    rows, prev = [], None
+    for idx, r in records:
+        if prev is not None and int(idx) - prev > 1:
+            rows.append((None, None))
+        rows.append((idx, [_sample_cell(r.get(c)) for c in columns]))
+        prev = int(idx)
+    return columns, rows
 
 
 def _record_fields(node):
@@ -283,14 +312,14 @@ def _resource_snippet(node):
         return (head + manual_note +
                 "res.path()  # validated on first access\n"
                 "with res.stream() as f:\n"
-                "    f.readline()")
+                "    ...  # f is a file-like object")
     auth = any(x.get('auth') for x in sources)
     return (head +
             ("# requires authentication: see the source above for the credentials it expects\n"
              if auth else '') +
             "res.path()  # downloads (and validates) if needed, returns the local path\n"
-            "with res.stream() as f:  # or read it without caring where it lives\n"
-            "    f.readline()")
+            "with res.stream() as f:  # read or download\n"
+            "    ...  # f is a file-like object")
 
 
 def _node_url(name):
@@ -341,6 +370,24 @@ def _node_code(name, cls=''):
 
 app.jinja_env.globals['node_code'] = _node_code
 app.jinja_env.globals['provider_of'] = lambda name: name.split(':', 1)[0]
+def _score_rows(node, frozen):
+    """Rows ``(score, meaning, count)`` for the Relevance Levels table: every
+    score the table defines (``defs``) or that occurs in its frozen
+    ``score_counts``, ordered numerically. ``meaning``/``count`` are None where
+    the table doesn't define the score / hasn't been verified yet."""
+    defs = dict(node.metadata.get('defs') or {})
+    counts = dict((frozen or {}).get('score_counts') or {})
+
+    def order(score):
+        try:
+            return (0, float(score), score)
+        except ValueError:
+            return (1, 0.0, score)
+    return [(score, defs.get(score), counts.get(score))
+            for score in sorted(set(defs) | set(counts), key=order)]
+
+
+app.jinja_env.globals['score_rows'] = _score_rows
 app.jinja_env.globals['frozen_count'] = _frozen_count
 
 
@@ -464,7 +511,7 @@ def _related(n, triples):
     it belongs to. For a Suite: its member Benchmarks and nested Suites."""
     name = n.qualified_name
     out = {'sources': [], 'derived_from': [], 'filtered_by': [], 'used_by': [],
-           'suites': [], 'member_benchmarks': [], 'member_suites': []}
+           'suites': [], 'member_benchmarks': [], 'member_suites': [], 'members': []}
     facet_kinds = {f'irds:{e}' for e in v2.ENTITIES}
     for subject, kind, obj, other in triples:
         if subject == name and kind == 'irds:derived_from':
@@ -481,6 +528,11 @@ def _related(n, triples):
             target = gq.node_data(store, obj)
             is_suite = target is not None and v2.is_subtype(target.type, v2.SUITE)
             out['member_suites' if is_suite else 'member_benchmarks'].append(obj)
+            out['members'].append({'name': obj, 'type': target.type if target else None})
+    # A table's sources are auto-downloadable unless any needs a manual download.
+    out['sources_manual'] = any(
+        x.get('kind') == 'manual'
+        for src in out['sources'] for x in (getattr(gq.node_data(store, src), 'metadata', None) or {}).get('sources') or [])
     return out
 
 
@@ -509,7 +561,7 @@ def node(qualified):
     return render_template(
         template, node=n, frozen=frozen, triples=triples, raw_triples=raw_triples,
         derived=derived,
-        type_labels=TYPE_LABELS, samples=_pretty_samples(frozen),
+        type_labels=TYPE_LABELS, sample_table=_pretty_samples(frozen, _record_fields(n) or ()),
         snippet=_python_snippet(n), record_fields=_record_fields(n), related=_related(n, triples),
         resource_kind=_resource_kind(n) if v2.is_subtype(n.type, v2.RESOURCE) else None)
 

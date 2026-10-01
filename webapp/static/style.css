@@ -286,3 +286,22 @@ pre code.hljs { background: transparent; padding: 0; }
 @media (min-width: 576px) {
   .acq-rows-wide .acq-row { grid-template-columns: 6rem minmax(0, 1fr); }
 }
+
+/* Inline type badges (next to a node name in lists, /search, /provider/<prefix>)
+   sit a pixel high against the <code> text; the page-title badge in an <h2>
+   sits two pixels low. */
+.badge.badge-sm { position: relative; top: 1px; }
+h2 > .badge.badge-sm { top: -2px; }
+
+/* sample-records table: headers are field names, not labels -- keep their
+   exact case and show them in monospace like the <code> used elsewhere */
+.sample-table thead th {
+  text-transform: none;
+  font-family: var(--tblr-font-monospace, monospace);
+  letter-spacing: normal;
+}
+/* long values wrap inside a capped column width instead of stretching the
+   table; short ones stay on one line, and many columns still scroll sideways */
+.sample-table th, .sample-table td:first-child { white-space: nowrap; }
+.sample-cell { max-width: 32rem; min-width: 4rem; width: max-content; white-space: normal; overflow-wrap: anywhere; }
+.sample-table td { vertical-align: top; }
