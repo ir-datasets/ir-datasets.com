@@ -1,0 +1,5 @@
+{
+  "name": "ir-datasets.com (webapp v2 prototype)",
+  "image": "ghcr.io/ir-datasets/ir-datasets.com:0.0.1-dev",
+  "forwardPorts": [5000]
+}

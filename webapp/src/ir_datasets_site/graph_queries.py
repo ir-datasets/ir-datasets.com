@@ -11,7 +11,7 @@ consume (``(subject, kind, object, other)`` triples, ``(name, type)`` pairs,
 import json
 import re
 
-from rdf_schema import (
+from .rdf_schema import (
     FROZEN_FIELDS, RDF_TYPE, RDFS_SUBCLASS_OF, edge_iri, edge_kind, graph_name,
     meta_field, node_iri, node_name, type_iri, type_name,
 )

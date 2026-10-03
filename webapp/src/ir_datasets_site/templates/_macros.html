@@ -1,3 +1,17 @@
+{% macro browse_rows(rows) %}
+{#- Static-build equivalent of static/browse.js's renderRow() -- same
+   markup, rendered server-side once at build time instead of fetched from
+   /api/browse at view time, since a static export has no live backend to
+   call. `rows` is a list of dicts shaped like /api/browse's own JSON rows
+   (name/type_label/badge_class/url). #}
+{% for row in rows %}
+<div class="list-group-item py-1 d-flex align-items-center">
+  <a href="{{ row.url }}"><code>{% set i = row.name.find(':') %}<span class="text-secondary">{{ row.name[:i + 1] if i != -1 else '' }}</span><span>{{ row.name[i + 1:] if i != -1 else row.name }}</span></code></a>
+  <span class="badge badge-sm align-middle ms-1 {{ row.badge_class }}">{{ row.type_label }}</span>
+</div>
+{% endfor %}
+{% endmacro %}
+
 {% macro node_header(node) %}
 <h2 class="mb-3">
   <code class="select"><a href="{{ url_for('provider', prefix=provider_of(node.qualified_name)) }}" class="text-secondary">{{ provider_of(node.qualified_name) }}:</a>{{ node.qualified_name.split(':', 1)[1] }}</code>

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_macros.html" as m %}
 {% block title %}{{ prefix }}: &mdash; ir-datasets.com{% endblock %}
 {% block content %}
 <h2 class="mb-3"><code>{{ prefix }}:</code></h2>
@@ -36,6 +37,9 @@
 
 <div class="card" data-browse-list data-name-prefix="{{ prefix }}:" data-limit="200">
   <div class="card-header"><h3 class="card-title">Nodes</h3></div>
+  {% if rows is not none %}
+  <div class="list-group list-group-flush">{{ m.browse_rows(rows) }}</div>
+  {% else %}
   <div class="card-body">
     <div class="search-input-wrap mb-2">
       <input type="text" data-browse-search value="" placeholder="filter by name&hellip;" autocomplete="off" class="form-control" />
@@ -58,5 +62,6 @@
       <span data-f-type class="badge badge-sm align-middle ms-1"></span>
     </div>
   </template>
+  {% endif %}
 </div>
 {% endblock %}

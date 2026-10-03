@@ -15,20 +15,21 @@ A node not in the store at all (freshest hf: repos the last snapshot missed)
 falls back to a live ``ir_datasets.v2`` resolution -- see ``node()`` -- so
 browsing an arbitrary hf repo still works, just not from the fast path.
 
-Run:
-    pip install -r requirements.txt
-    python build_graph_db.py      # once, or whenever you want a fresh snapshot
-    python app.py                 # http://127.0.0.1:5000
+Run (see ../README.md):
+    pip install -e ..                   # or: pip install "ir-datasets-site @ git+https://github.com/<org>/ir-datasets.com.git#subdirectory=webapp"
+    ir-datasets-site build-graph-db     # once, or whenever you want a fresh snapshot
+    ir-datasets-site serve              # http://127.0.0.1:5000
 """
+import os
 import re
 import sys
 from pathlib import Path
 
 import pyoxigraph as ox
 from markupsafe import Markup, escape
-from flask import Flask, abort, jsonify, render_template, request, url_for
+from flask import Flask, abort, jsonify, render_template, request, send_file, url_for
 
-import graph_queries as gq
+from . import graph_queries as gq
 
 try:
     import ir_datasets.v2 as v2
@@ -37,12 +38,16 @@ except ImportError:
     # this interpreter (see README.md's "pip install -e" note -- this is a
     # convenience for running the app without that step, not a replacement
     # for it in a real deployment).
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / 'ir-datasets'))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[4] / 'ir-datasets'))
     import ir_datasets.v2 as v2
 
 app = Flask(__name__)
 
-STORE_PATH = Path(__file__).resolve().parent / 'graph.db'
+#: Defaults to ./graph.db (relative to wherever the process is run from),
+#: not a path inside this installed package -- the package directory isn't
+#: guaranteed writable (site-packages) and shouldn't hold generated data
+#: anyway. Override with $IR_DATASETS_SITE_STORE or ``--store`` (see cli.py).
+STORE_PATH = Path(os.environ.get('IR_DATASETS_SITE_STORE', 'graph.db')).resolve()
 try:
     store = ox.Store.read_only(str(STORE_PATH))
 except OSError:
@@ -51,6 +56,36 @@ except OSError:
     # to at request time) store so the app can at least start.
     store = ox.Store(str(STORE_PATH))
 gq.warm(store)
+
+#: Gzipped N-Quads dump of the whole store -- a plain, standard RDF
+#: serialization of the same quads ``graph.db`` holds in Oxigraph's own
+#: internal (RocksDB-backed, not independently readable) format, for anyone
+#: who wants the data itself rather than just browsing it. Written by
+#: build_graph_db.py's ``build()`` right alongside ``graph.db`` by default
+#: (see its ``default_dump_path``) -- served from here by ``graph_dump()``,
+#: and copied as-is into a static build's output by static_site.py.
+DUMP_PATH = STORE_PATH.with_suffix('.nq.gz')
+
+
+@app.context_processor
+def _inject_graph_dump_available():
+    """So base.html's download link (see its footer) can show up only when
+    there's actually something to download -- same ``DUMP_PATH`` check
+    whether this runs for a live request or (via static_site.py's direct
+    ``render_template()`` calls) a static build."""
+    return {'graph_dump_available': DUMP_PATH.exists()}
+
+
+@app.route('/graph.nq.gz')
+def graph_dump():
+    """The download behind base.html's footer link -- the whole store as
+    gzipped N-Quads (see DUMP_PATH). 404s with a clear hint if build-graph-db
+    hasn't been run yet (or was run with --no-dump)."""
+    if not DUMP_PATH.exists():
+        abort(404, f'{DUMP_PATH} not found -- run `ir-datasets-site build-graph-db` '
+                    f'(without --no-dump) first')
+    return send_file(DUMP_PATH, mimetype='application/gzip',
+                      as_attachment=True, download_name='graph.nq.gz')
 
 #: The top-level node categories this site knows how to render specially --
 #: used for the home page's stat cards and the browse page's type filter.
@@ -445,7 +480,21 @@ def search():
         regex=regex,
         available_providers=gq.available_providers(store),
         selected_providers=selected,
-        total=total)
+        total=total,
+        # Always None for a live request -- only static_site.py's build()
+        # passes real rows (pre-rendered inline, no JS/AJAX; see
+        # search.html's "{% if rows is not none %}" branch).
+        rows=None, static_search_url=None)
+
+
+def _row_dict(name, type_):
+    """One /api/browse row's JSON shape -- also reused, unchanged, by
+    static_site.py's build() to pre-render the same rows inline (no live
+    /api/browse call possible from a static export)."""
+    return {'name': name, 'type_label': _type_label(type_), 'type': type_,
+            'badge_class': _type_badge_class(type_),
+            'url': _node_url(name), 'provider': name.split(':', 1)[0],
+            'provider_url': url_for('provider', prefix=name.split(':', 1)[0])}
 
 
 @app.route('/api/browse')
@@ -479,11 +528,7 @@ def api_browse():
                                 name_prefix=name_prefix, providers=_selected_providers(scope=scope),
                                 limit=limit, offset=offset, regex=regex)
     return jsonify({
-        'rows': [{'name': name, 'type_label': _type_label(type_), 'type': type_,
-                 'badge_class': _type_badge_class(type_),
-                 'url': _node_url(name), 'provider': name.split(':', 1)[0],
-                 'provider_url': url_for('provider', prefix=name.split(':', 1)[0])}
-                for name, type_ in rows],
+        'rows': [_row_dict(name, type_) for name, type_ in rows],
         'total': total, 'offset': offset, 'limit': limit,
     })
 
@@ -501,7 +546,10 @@ def provider(prefix):
     manifest = p.manifest()
     return render_template(
         'provider.html', provider=p, prefix=prefix, manifest=manifest,
-        type_labels=TYPE_LABELS)
+        type_labels=TYPE_LABELS,
+        # See search()'s matching comment -- only static_site.py's build()
+        # passes real rows.
+        rows=None)
 
 
 def _related(n, triples):
@@ -538,9 +586,18 @@ def _related(n, triples):
 
 @app.route('/n/<path:qualified>')
 def node(qualified):
-    n = gq.node_data(store, qualified)
-    triples = gq.triples_of(store, qualified) if n is not None else []
-    raw_triples = gq.raw_triples_of(store, qualified) if n is not None else []
+    try:
+        n = gq.node_data(store, qualified)
+        triples = gq.triples_of(store, qualified) if n is not None else []
+        raw_triples = gq.raw_triples_of(store, qualified) if n is not None else []
+    except ValueError:
+        # `qualified` (straight from the URL) isn't a syntactically valid
+        # IRI component -- e.g. a raw space, which some providers' own node
+        # names have turned up (see rdf_schema.py's to_quads() for the
+        # build-time version of the same problem). No such node can ever
+        # exist in the store either way (building its IRI to look it up
+        # fails identically), so this is a 404, not an unhandled 500.
+        abort(404, f'{qualified!r} is not a valid node name')
     if n is None:
         # Not in the materialized snapshot (most likely a fresh hf: repo the
         # last build's crawl missed, or predates it) -- resolve it live, same
@@ -581,5 +638,7 @@ def not_found(e):
 
 
 if __name__ == '__main__':
-    import os
+    # Also reachable via the installed console script (`ir-datasets-site
+    # serve`, see cli.py); this remains useful for `python -m
+    # ir_datasets_site.app` during local development.
     app.run(debug=True, port=int(os.environ.get('PORT', 5000)))

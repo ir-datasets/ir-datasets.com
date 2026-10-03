@@ -1,0 +1,28 @@
+name: webapp devcontainer
+
+# Builds the dev container image from .devcontainer/Dockerfile (the same
+# image used for local development -- see .devcontainer/devcontainer.json)
+# and makes sure the two commands a fresh checkout needs to work still do,
+# inside it.
+
+on:
+  push:
+
+jobs:
+  devcontainer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build dev container image
+        run: docker build -t ir-datasets-site-devcontainer -f .devcontainer/Dockerfile .
+
+      - name: ir-datasets-site build-graph-db --providers irds
+        run: |
+          docker run --rm -v "$PWD/webapp:/work" -w /work ir-datasets-site-devcontainer \
+            ir-datasets-site build-graph-db --providers irds --out graph.db
+
+      - name: ir-datasets-site build-static --out dist
+        run: |
+          docker run --rm -v "$PWD/webapp:/work" -w /work ir-datasets-site-devcontainer \
+            ir-datasets-site build-static --out dist --store graph.db
