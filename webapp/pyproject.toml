@@ -13,7 +13,7 @@ dependencies = [
     "pyoxigraph>=0.4",
     # ir_datasets.v2 isn't released to PyPI yet -- this is the only branch
     # that currently has it (see ../.devcontainer/Dockerfile).
-    "ir_datasets @ git+https://github.com/mam10eks/ir_datasets.git@v2",
+    "ir_datasets @ git+https://github.com/ir-datasets/ir-datasets.git@v2",
 ]
 
 [project.scripts]

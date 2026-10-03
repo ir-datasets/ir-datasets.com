@@ -28,8 +28,12 @@ nodes in the catalog -- large enough that it needing its own real
 into it, is exactly what makes "hide CLIRMatrix by default" possible here
 with no special-casing.)
 """
+import logging
+
 import pyoxigraph as ox
 from ir_datasets.v2 import Literal as _V2Literal
+
+logger = logging.getLogger(__name__)
 
 NODE = 'http://ir-datasets.com/id/'
 TYPE = 'http://ir-datasets.com/ns/type#'
@@ -104,18 +108,50 @@ def graph_for(qualified_name):
 def to_quads(triples):
     """``export_triples()``'s ``(subject, predicate, object)`` triples ->
     pyoxigraph ``Quad`` objects, per the mapping above -- each placed in its
-    subject's named graph (``graph_for``)."""
-    for subject, predicate, obj in triples:
-        s = node_iri(subject)
-        g = graph_iri(graph_for(subject))
-        if predicate == 'type':
-            yield ox.Quad(s, RDF_TYPE, type_iri(obj), g)
-        elif predicate == 'subClassOf':
-            yield ox.Quad(type_iri(subject), RDFS_SUBCLASS_OF, type_iri(obj), g)
-        elif isinstance(obj, _V2Literal):
-            value = obj.value
-            literal = ox.Literal(str(value), datatype=XSD_INTEGER) if isinstance(value, int) \
-                else ox.Literal(str(value))
-            yield ox.Quad(s, meta_iri(predicate), literal, g)
-        else:
-            yield ox.Quad(s, edge_iri(predicate), node_iri(obj), g)
+    subject's named graph (``graph_for``).
+
+    A malformed triple (e.g. a provider yielding a name/value that isn't a
+    valid IRI component, such as a raw space -- see the ``trec-browser``
+    provider) would otherwise surface as a bare ``ValueError: Invalid IRI
+    code point ...`` with no indication of *which* triple, out of
+    potentially hundreds of thousands, caused it. Logging + re-raising with
+    the offending ``(subject, predicate, object)`` attached turns that into
+    something actually actionable. Fetching the *next* triple can itself
+    raise (a provider's own parsing logic failing before it ever produces a
+    triple), so that's guarded too, separately from the conversion below."""
+    it = iter(triples)
+    i = 0
+    while True:
+        try:
+            subject, predicate, obj = next(it)
+        except StopIteration:
+            return
+        except Exception as e:
+            logger.error('Failed to fetch triple #%d from the provider (%s: %s)',
+                         i, type(e).__name__, e)
+            raise
+        try:
+            s = node_iri(subject)
+            g = graph_iri(graph_for(subject))
+            if predicate == 'type':
+                yield ox.Quad(s, RDF_TYPE, type_iri(obj), g)
+            elif predicate == 'subClassOf':
+                yield ox.Quad(type_iri(subject), RDFS_SUBCLASS_OF, type_iri(obj), g)
+            elif isinstance(obj, _V2Literal):
+                value = obj.value
+                literal = ox.Literal(str(value), datatype=XSD_INTEGER) if isinstance(value, int) \
+                    else ox.Literal(str(value))
+                yield ox.Quad(s, meta_iri(predicate), literal, g)
+            else:
+                yield ox.Quad(s, edge_iri(predicate), node_iri(obj), g)
+        except Exception as e:
+            logger.error('Failed to convert triple #%d to a quad: subject=%r, predicate=%r, '
+                         'object=%r (%s: %s)', i, subject, predicate, obj,
+                         type(e).__name__, e)
+            raise ValueError(
+                f'Failed to convert triple #{i} to a quad: subject={subject!r}, '
+                f'predicate={predicate!r}, object={obj!r} -- likely malformed data '
+                f"from the {graph_for(subject)!r} provider, not a bug in this repo's "
+                'own code (see rdf_schema.py docstring)'
+            ) from e
+        i += 1

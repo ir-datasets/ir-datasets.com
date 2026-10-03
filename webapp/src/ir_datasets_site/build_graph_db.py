@@ -21,6 +21,7 @@ Run:
 """
 import argparse
 import gzip
+import logging
 import os
 import shutil
 import sys
@@ -29,6 +30,8 @@ from pathlib import Path
 import pyoxigraph as ox
 
 from .rdf_schema import to_quads
+
+logger = logging.getLogger(__name__)
 
 try:
     import ir_datasets.v2 as v2
@@ -64,13 +67,21 @@ def build(providers=DEFAULT_PROVIDERS, out=DEFAULT_STORE_PATH, dump=True):
     if out.exists():
         shutil.rmtree(out)
     store = ox.Store(str(out))
+    logger.info('fetching triples for providers=%s', list(providers))
     triples = v2.graph.export_triples(providers=list(providers))
-    quads = list(to_quads(triples))
+    try:
+        quads = list(to_quads(triples))
+    except Exception:
+        logger.error('build-graph-db failed while converting triples to quads for '
+                     'providers=%s -- see the error above for which triple and why', list(providers))
+        raise
+    logger.info('converted %d triples to quads, writing to %s', len(quads), out)
     store.bulk_extend(quads)
     store.optimize()
     store.flush()
     if dump:
         dump_path = Path(dump) if dump is not True else default_dump_path(out)
+        logger.info('writing N-Quads dump to %s', dump_path)
         with gzip.open(dump_path, 'wb') as f:
             store.dump(f, ox.RdfFormat.N_QUADS)
     return len(quads)

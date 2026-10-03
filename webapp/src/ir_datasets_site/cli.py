@@ -8,11 +8,17 @@ to locate/run those files directly.
     ir-datasets-site build-static [--out dist] [--providers irds hf] [--store graph.db]
 """
 import argparse
+import logging
 import os
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(prog='ir-datasets-site', description=__doc__)
+    parser.add_argument(
+        '--log-level', default=os.environ.get('IR_DATASETS_SITE_LOG_LEVEL', 'INFO'),
+        help='logging verbosity (default: INFO, or $IR_DATASETS_SITE_LOG_LEVEL) -- '
+             'DEBUG/INFO/WARNING/ERROR; affects progress/diagnostic messages from e.g. '
+             'build-graph-db, not the printed summary line itself')
     subparsers = parser.add_subparsers(dest='command', required=True)
 
     from . import build_graph_db as bgd
@@ -59,6 +65,8 @@ def main(argv=None):
         help='graph.db path (default: $IR_DATASETS_SITE_STORE, or ./graph.db)')
 
     args = parser.parse_args(argv)
+
+    logging.basicConfig(level=args.log_level.upper(), format='%(levelname)s %(name)s: %(message)s')
 
     if args.command == 'build-graph-db':
         dump = False if not args.dump_enabled else (args.dump or True)

@@ -5,8 +5,8 @@ FROM python:3.11-slim
 # needs libxml2/libxslt headers, pyoxigraph needs a C/Rust toolchain if no
 # prebuilt wheel matches) plus git, needed to pip-install ir_datasets.v2
 # straight from its branch below (same approach as
-# ../approval-tests-ir-datasets/.devcontainer/Dockerfile, pointed at this
-# fork/branch since that's where the v2 prototype currently lives).
+# ../approval-tests-ir-datasets/.devcontainer/Dockerfile, pointed at the
+# upstream repo's v2 branch, where the v2 prototype currently lives).
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     build-essential \
@@ -25,3 +25,7 @@ WORKDIR /workspaces/ir-datasets.com
 # without reinstalling.
 COPY webapp ./webapp
 RUN pip install --no-cache-dir -e ./webapp
+
+# Additional provider, not bundled with ir_datasets itself: adds the
+# trec-browser dataset provider used by this webapp's `trec-browser` graph.
+RUN pip install --no-cache-dir git+https://github.com/ir-datasets/trec-browser-provider.git
