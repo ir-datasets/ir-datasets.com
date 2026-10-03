@@ -586,9 +586,18 @@ def _related(n, triples):
 
 @app.route('/n/<path:qualified>')
 def node(qualified):
-    n = gq.node_data(store, qualified)
-    triples = gq.triples_of(store, qualified) if n is not None else []
-    raw_triples = gq.raw_triples_of(store, qualified) if n is not None else []
+    try:
+        n = gq.node_data(store, qualified)
+        triples = gq.triples_of(store, qualified) if n is not None else []
+        raw_triples = gq.raw_triples_of(store, qualified) if n is not None else []
+    except ValueError:
+        # `qualified` (straight from the URL) isn't a syntactically valid
+        # IRI component -- e.g. a raw space, which some providers' own node
+        # names have turned up (see rdf_schema.py's to_quads() for the
+        # build-time version of the same problem). No such node can ever
+        # exist in the store either way (building its IRI to look it up
+        # fails identically), so this is a 404, not an unhandled 500.
+        abort(404, f'{qualified!r} is not a valid node name')
     if n is None:
         # Not in the materialized snapshot (most likely a fresh hf: repo the
         # last build's crawl missed, or predates it) -- resolve it live, same
