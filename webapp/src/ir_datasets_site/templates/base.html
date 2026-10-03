@@ -18,6 +18,7 @@
       <div class="navbar-nav flex-row order-md-last flex-fill">
         <div class="nav-item flex-fill">
           {% block navbar_search %}
+          {% if not static_build|default(false) %}
           <form onsubmit="return false" autocomplete="off" class="navbar-search">
             <div class="search-input-wrap">
               <input type="search" data-browse-search data-nav-search value="{{ query|default('') }}" class="form-control"
@@ -33,6 +34,7 @@
               </button>
             </div>
           </form>
+          {% endif %}
           {% endblock %}
         </div>
       </div>

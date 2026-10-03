@@ -15,11 +15,12 @@ A node not in the store at all (freshest hf: repos the last snapshot missed)
 falls back to a live ``ir_datasets.v2`` resolution -- see ``node()`` -- so
 browsing an arbitrary hf repo still works, just not from the fast path.
 
-Run:
-    pip install -r requirements.txt
-    python build_graph_db.py      # once, or whenever you want a fresh snapshot
-    python app.py                 # http://127.0.0.1:5000
+Run (see ../README.md):
+    pip install -e ..                   # or: pip install "ir-datasets-site @ git+https://github.com/<org>/ir-datasets.com.git#subdirectory=webapp"
+    ir-datasets-site build-graph-db     # once, or whenever you want a fresh snapshot
+    ir-datasets-site serve              # http://127.0.0.1:5000
 """
+import os
 import re
 import sys
 from pathlib import Path
@@ -28,7 +29,7 @@ import pyoxigraph as ox
 from markupsafe import Markup, escape
 from flask import Flask, abort, jsonify, render_template, request, url_for
 
-import graph_queries as gq
+from . import graph_queries as gq
 
 try:
     import ir_datasets.v2 as v2
@@ -37,12 +38,16 @@ except ImportError:
     # this interpreter (see README.md's "pip install -e" note -- this is a
     # convenience for running the app without that step, not a replacement
     # for it in a real deployment).
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / 'ir-datasets'))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[4] / 'ir-datasets'))
     import ir_datasets.v2 as v2
 
 app = Flask(__name__)
 
-STORE_PATH = Path(__file__).resolve().parent / 'graph.db'
+#: Defaults to ./graph.db (relative to wherever the process is run from),
+#: not a path inside this installed package -- the package directory isn't
+#: guaranteed writable (site-packages) and shouldn't hold generated data
+#: anyway. Override with $IR_DATASETS_SITE_STORE or ``--store`` (see cli.py).
+STORE_PATH = Path(os.environ.get('IR_DATASETS_SITE_STORE', 'graph.db')).resolve()
 try:
     store = ox.Store.read_only(str(STORE_PATH))
 except OSError:
@@ -445,7 +450,21 @@ def search():
         regex=regex,
         available_providers=gq.available_providers(store),
         selected_providers=selected,
-        total=total)
+        total=total,
+        # Always None for a live request -- only static_site.py's build()
+        # passes real rows (pre-rendered inline, no JS/AJAX; see
+        # search.html's "{% if rows is not none %}" branch).
+        rows=None, static_search_url=None)
+
+
+def _row_dict(name, type_):
+    """One /api/browse row's JSON shape -- also reused, unchanged, by
+    static_site.py's build() to pre-render the same rows inline (no live
+    /api/browse call possible from a static export)."""
+    return {'name': name, 'type_label': _type_label(type_), 'type': type_,
+            'badge_class': _type_badge_class(type_),
+            'url': _node_url(name), 'provider': name.split(':', 1)[0],
+            'provider_url': url_for('provider', prefix=name.split(':', 1)[0])}
 
 
 @app.route('/api/browse')
@@ -479,11 +498,7 @@ def api_browse():
                                 name_prefix=name_prefix, providers=_selected_providers(scope=scope),
                                 limit=limit, offset=offset, regex=regex)
     return jsonify({
-        'rows': [{'name': name, 'type_label': _type_label(type_), 'type': type_,
-                 'badge_class': _type_badge_class(type_),
-                 'url': _node_url(name), 'provider': name.split(':', 1)[0],
-                 'provider_url': url_for('provider', prefix=name.split(':', 1)[0])}
-                for name, type_ in rows],
+        'rows': [_row_dict(name, type_) for name, type_ in rows],
         'total': total, 'offset': offset, 'limit': limit,
     })
 
@@ -501,7 +516,10 @@ def provider(prefix):
     manifest = p.manifest()
     return render_template(
         'provider.html', provider=p, prefix=prefix, manifest=manifest,
-        type_labels=TYPE_LABELS)
+        type_labels=TYPE_LABELS,
+        # See search()'s matching comment -- only static_site.py's build()
+        # passes real rows.
+        rows=None)
 
 
 def _related(n, triples):
@@ -581,5 +599,7 @@ def not_found(e):
 
 
 if __name__ == '__main__':
-    import os
+    # Also reachable via the installed console script (`ir-datasets-site
+    # serve`, see cli.py); this remains useful for `python -m
+    # ir_datasets_site.app` during local development.
     app.run(debug=True, port=int(os.environ.get('PORT', 5000)))

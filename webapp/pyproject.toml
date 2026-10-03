@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ir-datasets-site"
+version = "0.1.0"
+description = "ir-datasets.com v2 prototype: a Flask app rendering pages from a materialized ir_datasets.v2 graph snapshot"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "flask>=3.0",
+    "pyoxigraph>=0.4",
+    # ir_datasets.v2 isn't released to PyPI yet -- this is the only branch
+    # that currently has it (see ../.devcontainer/Dockerfile).
+    "ir_datasets @ git+https://github.com/mam10eks/ir_datasets.git@v2",
+]
+
+[project.scripts]
+ir-datasets-site = "ir_datasets_site.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+ir_datasets_site = ["templates/**/*", "static/**/*"]

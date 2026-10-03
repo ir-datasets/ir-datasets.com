@@ -11,13 +11,26 @@
   <div class="card-body">
     <div class="mb-3">
       <label class="form-label">Type</label>
+      {% if rows is not none %}
+      {#- Static build: no JS, no free-text/regex search (see
+         static_site.py's build() docstring) -- type filtering is just a
+         fixed set of pre-rendered pages, one per type, linked directly. #}
+      <div class="list-group list-group-flush">
+        <a class="list-group-item list-group-item-action {{ 'active' if not type_filter else '' }}" href="{{ static_search_url('') }}">all types</a>
+        {% for type, label in type_filter_labels.items() %}
+        <a class="list-group-item list-group-item-action {{ 'active' if type == type_filter else '' }}" href="{{ static_search_url(type) }}">{{ label }}</a>
+        {% endfor %}
+      </div>
+      {% else %}
       <select data-browse-type class="form-select">
         <option value="">all types</option>
         {% for type, label in type_filter_labels.items() %}
         <option value="{{ type }}" {% if type == type_filter %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
       </select>
+      {% endif %}
     </div>
+    {% if rows is none %}
     <div>
       <label class="form-label">Providers</label>
       {% for p in available_providers %}
@@ -28,11 +41,17 @@
       </label>
       {% endfor %}
     </div>
+    {% endif %}
   </div>
 </div>
 {% endblock %}
 
 {% block content %}
+{% if rows is not none %}
+<div class="card">
+  <div class="list-group list-group-flush">{{ m.browse_rows(rows) }}</div>
+</div>
+{% else %}
 <div class="card" data-browse-list data-limit="200" id="main-browse-list">
   <p data-browse-status class="text-secondary mb-0" hidden></p>
   <div class="list-group list-group-flush" data-browse-rows></div>
@@ -44,4 +63,5 @@
     </div>
   </template>
 </div>
+{% endif %}
 {% endblock %}

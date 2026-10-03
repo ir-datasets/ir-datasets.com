@@ -9,21 +9,22 @@ fully dynamic ``hf`` provider (see ``hf_provider.export_triples``) -- run
 this again whenever you want a fresher one.
 
 Run:
-    python build_graph_db.py [--providers irds hf clirmatrix] [--out graph.db]
+    ir-datasets-site build-graph-db [--providers irds hf clirmatrix] [--out graph.db]
 """
 import argparse
+import os
 import shutil
 import sys
 from pathlib import Path
 
 import pyoxigraph as ox
 
-from rdf_schema import to_quads
+from .rdf_schema import to_quads
 
 try:
     import ir_datasets.v2 as v2
 except ImportError:
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / 'ir-datasets'))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[4] / 'ir-datasets'))
     import ir_datasets.v2 as v2
 
 #: Every currently-installed provider, not a hardcoded list -- a provider
@@ -31,7 +32,10 @@ except ImportError:
 #: provider was) is picked up automatically instead of silently being left
 #: out of the materialized store until someone remembers to update this file.
 DEFAULT_PROVIDERS = tuple(sorted(v2.graph.providers))
-DEFAULT_STORE_PATH = Path(__file__).resolve().parent / 'graph.db'
+#: Matches app.py's STORE_PATH default/override (./graph.db, or
+#: $IR_DATASETS_SITE_STORE) so running build-graph-db then serve with no
+#: extra flags just works.
+DEFAULT_STORE_PATH = Path(os.environ.get('IR_DATASETS_SITE_STORE', 'graph.db')).resolve()
 
 
 def build(providers=DEFAULT_PROVIDERS, out=DEFAULT_STORE_PATH):

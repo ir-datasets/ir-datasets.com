@@ -24,15 +24,28 @@ ahead of time the way a frozen manifest can. A node the last snapshot missed
 
 ## Run it
 
+Installable directly from this repo (pulls in `ir_datasets.v2` too, pinned
+in `pyproject.toml` to the branch that has it -- see `../.devcontainer/Dockerfile`
+for the same approach):
+
 ```bash
-cd ~/ws/ir-datasets.com/webapp
-pip install -r requirements.txt
-pip install -e ~/ws/ir-datasets          # if ir_datasets.v2 isn't already installed
-python build_graph_db.py                 # builds graph.db from the current manifest (+ a fresh hf crawl)
-python app.py                            # http://127.0.0.1:5000
+pip install "ir-datasets-site @ git+https://github.com/<org>/ir-datasets.com.git#subdirectory=webapp"
+ir-datasets-site build-graph-db          # Potentially add something like --provider irds to speed up. Builds ./graph.db from the current manifest (+ a fresh hf crawl)
+ir-datasets-site serve                   # http://127.0.0.1:5000
 ```
 
-Re-run `build_graph_db.py` whenever `ir_datasets/v2/manifest.json` changes or
+Or editable, from a local checkout (e.g. inside `.devcontainer`, or to
+iterate on `ir_datasets.v2` alongside this app):
+
+```bash
+cd ~/ws/ir-datasets.com/webapp
+pip install -e .
+pip install -e ~/ws/ir-datasets          # if you want your own ir_datasets.v2 checkout instead of pyproject.toml's pinned branch
+ir-datasets-site build-graph-db
+ir-datasets-site serve
+```
+
+Re-run `build-graph-db` whenever `ir_datasets/v2/manifest.json` changes or
 you want a fresher `hf:` snapshot -- it's a full delete-and-recreate, not
 incremental, and takes well under a second for `irds` alone (the `hf` crawl's
 time depends on how many repos are tagged `ir-datasets` on the Hub; pass
@@ -40,12 +53,46 @@ time depends on how many repos are tagged `ir-datasets` on the Hub; pass
 (`cd ~/ws/ir-datasets && python -m ir_datasets.v2.freeze --verify`) — counts,
 hashes and sample records only render if a manifest has been frozen.
 
+`graph.db` is written to `./graph.db` (the current working directory), not
+inside the installed package -- override with `--out`/`--store` or the
+`IR_DATASETS_SITE_STORE` environment variable if you want it elsewhere.
+
+## Static build
+
+No live process required at all -- `ir-datasets-site build-static` renders
+the whole site, once, to plain HTML + assets (see `static_site.py`):
+
+```bash
+ir-datasets-site build-graph-db          # (as above) graph.db must exist first
+ir-datasets-site build-static --out dist
+python -m http.server 8000 --directory dist   # or any other static file host
+```
+
+By default this includes every provider except `clirmatrix`/`legacy` (same
+providers the live home page hides by default) -- pass `--providers irds hf
+clirmatrix ...` to include more, keeping in mind each provider means one HTML
+file per node (CLIRMatrix alone is ~620k nodes).
+
+This drops the two things that genuinely need a live backend:
+
+- **Free-text/regex search** (`/search?q=...&regex=1`) -- unbounded input,
+  can't be enumerated into finitely many pages. The static build instead
+  ships one pre-rendered page per type filter (`/search`,
+  `/search/type/<type>`), and hides the live navbar search box (it has
+  nothing to call).
+- **The `hf:` live-fallback resolution** for a node missing from the
+  materialized snapshot (see `node()` in `app.py`) -- a static export only
+  ever knows what's in `graph.db`.
+
+Everything else (home page, every node page, every provider page) renders
+identically to the live app.
+
 ## What's here
 
 | Route | Renders |
 |---|---|
 | `/` | Node-type counts, installed providers |
-| `/browse?type=&q=` | Every node, filterable by type / name substring |
+| `/search?type=&q=` | Every node, filterable by type / name substring (live app only -- see "Static build" above) |
 | `/provider/<prefix>` | One provider's nodes, declared vocabulary, aliases |
 | `/n/<qualified>` | One node — dispatches to a type-specific template (`node_benchmark.html`, `node_table.html`, `node_resource.html`, `node_suite.html`), falling back to `node_generic.html` for a type this site has no template for yet (a third-party provider's own vocabulary, once those exist) |
 
