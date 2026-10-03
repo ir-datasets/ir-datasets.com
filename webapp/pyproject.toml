@@ -10,6 +10,7 @@ readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
     "flask>=3.0",
+    "tqdm",
     "pyoxigraph>=0.4",
     # ir_datasets.v2 isn't released to PyPI yet -- this is the only branch
     # that currently has it (see ../.devcontainer/Dockerfile).

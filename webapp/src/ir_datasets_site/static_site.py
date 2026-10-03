@@ -26,6 +26,7 @@ import shutil
 from pathlib import Path
 
 from flask import render_template
+from tqdm import tqdm
 
 from . import graph_queries as gq
 from .app import (
@@ -168,7 +169,7 @@ def build(out='dist', providers=None):
                 static_build=True)
             _write_page(out_dir, _search_url(type_filter), html)
 
-        for prefix in selected:
+        for prefix in tqdm(selected, desc='provider pages', unit='provider'):
             p = v2.graph.providers[prefix]
             rows = _rows_for(name_prefix=f'{prefix}:', providers=_selected_providers(scope={prefix}))
             html = render_template(
@@ -178,7 +179,7 @@ def build(out='dist', providers=None):
 
     with app.test_client() as client:
         names = [name for name, _type in gq.list_nodes(store, providers=selected, limit=None)[0]]
-        for name in names:
+        for name in tqdm(names, desc='node pages', unit='page'):
             render_to_static_page(client, f'/n/{name}', out_dir)
 
     static_src = Path(__file__).resolve().parent / 'static'
