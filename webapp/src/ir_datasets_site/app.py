@@ -619,6 +619,27 @@ def _alt_note(name):
     return view.metadata.get('alternative_note') if view is not None else None
 
 
+def _alternatives(name):
+    """Every table linked to ``name`` by ``irds:alternative_of`` in either
+    direction, transitively (``v2.alternatives`` over the materialized store
+    rather than the live graph), excluding ``name`` itself."""
+    seen, stack = {name}, [name]
+    while stack:
+        current = stack.pop()
+        for subject, kind, obj, other in gq.triples_of(store, current):
+            if kind == 'irds:alternative_of' and other not in seen:
+                seen.add(other)
+                stack.append(other)
+    return sorted(seen - {name})
+
+
+def _alt_note(name):
+    """The short ``alternative_note`` a table declares about how it differs
+    from the table it is an alternative of, or ``None``."""
+    view = gq.node_data(store, name)
+    return view.metadata.get('alternative_note') if view is not None else None
+
+
 def _related(n, triples):
     """What a node's page links to, all read off its own edges. For a Table:
     the Resource(s) it's parsed from, any Table it's derived from (plus what
