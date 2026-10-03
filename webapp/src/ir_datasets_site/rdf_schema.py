@@ -2,9 +2,11 @@
 ``graph_queries.py`` (reader) for materializing ``ir_datasets.v2``'s graph
 (see ``Graph.export_triples()``) into a pyoxigraph store.
 
-A node's qualified name (``irds:antique-docs``) becomes its IRI's local part
-verbatim -- recovering it is just stripping a fixed prefix, no lookup table
-needed. Two more namespaces keep "this is an edge to another node" and "this
+A node's qualified name (``irds:antique-docs``) becomes its IRI's local part,
+percent-escaping whatever isn't a valid IRI code point (e.g. a space in an
+``hf:`` fragment) -- recovering it is just stripping a fixed prefix and
+unescaping, no lookup table needed. Two more namespaces keep "this is an
+edge to another node" and "this
 is a literal property" visually and mechanically distinct, so a triples-table
 query never needs to filter rdf:type/rdfs:subClassOf out by hand:
 
@@ -29,6 +31,7 @@ into it, is exactly what makes "hide CLIRMatrix by default" possible here
 with no special-casing.)
 """
 import logging
+from urllib.parse import quote, unquote
 
 import pyoxigraph as ox
 from ir_datasets.v2 import Literal as _V2Literal
@@ -52,51 +55,65 @@ FROZEN_FIELDS = {'count', 'content_sha256', 'hash_scheme', 'record_schema',
                  'samples', 'commit', 'hashes_confirmed', 'score_counts'}
 
 
+#: A qualified name is otherwise free-form (``hf:`` fragments in particular
+#: can carry whatever a dataset card's own keys/config names contain, e.g.
+#: spaces), but an IRI can't -- percent-encode whatever isn't a valid IRI
+#: code point when building one, and undo that when recovering the name.
+#: ``/``, ``:``, ``@`` stay unescaped since they're meaningful path/provider
+#: separators within a name (and valid IRI code points on their own).
+def _escape(name):
+    return quote(name, safe="/:@-_.~!$&'()*+,;=")
+
+
+def _unescape(value):
+    return unquote(value)
+
+
 def node_iri(name):
-    return ox.NamedNode(NODE + name)
+    return ox.NamedNode(NODE + _escape(name))
 
 
 def node_name(iri):
     """A ``NamedNode`` under ``NODE`` back to its qualified name, or ``None``
     if it isn't one (e.g. a type IRI turned up where a node was expected)."""
     value = iri.value if hasattr(iri, 'value') else str(iri)
-    return value[len(NODE):] if value.startswith(NODE) else None
+    return _unescape(value[len(NODE):]) if value.startswith(NODE) else None
 
 
 def type_iri(qualified_type):
-    return ox.NamedNode(TYPE + qualified_type)
+    return ox.NamedNode(TYPE + _escape(qualified_type))
 
 
 def type_name(iri):
     value = iri.value if hasattr(iri, 'value') else str(iri)
-    return value[len(TYPE):] if value.startswith(TYPE) else None
+    return _unescape(value[len(TYPE):]) if value.startswith(TYPE) else None
 
 
 def edge_iri(qualified_kind):
-    return ox.NamedNode(EDGE + qualified_kind)
+    return ox.NamedNode(EDGE + _escape(qualified_kind))
 
 
 def edge_kind(iri):
     value = iri.value if hasattr(iri, 'value') else str(iri)
-    return value[len(EDGE):] if value.startswith(EDGE) else None
+    return _unescape(value[len(EDGE):]) if value.startswith(EDGE) else None
 
 
 def meta_iri(field):
-    return ox.NamedNode(META + field)
+    return ox.NamedNode(META + _escape(field))
 
 
 def meta_field(iri):
     value = iri.value if hasattr(iri, 'value') else str(iri)
-    return value[len(META):] if value.startswith(META) else None
+    return _unescape(value[len(META):]) if value.startswith(META) else None
 
 
 def graph_iri(name):
-    return ox.NamedNode(GRAPH + name)
+    return ox.NamedNode(GRAPH + _escape(name))
 
 
 def graph_name(iri):
     value = iri.value if hasattr(iri, 'value') else str(iri)
-    return value[len(GRAPH):] if value.startswith(GRAPH) else None
+    return _unescape(value[len(GRAPH):]) if value.startswith(GRAPH) else None
 
 
 def graph_for(qualified_name):

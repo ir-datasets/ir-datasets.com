@@ -307,6 +307,31 @@ def _python_snippet(node):
     return f"import ir_datasets.v2\nnode = ir_datasets.v2.load({name!r})"
 
 
+def _snippet_config(node):
+    """What the Use It card's dropdowns need to rebuild a benchmark's snippet
+    client-side (``static/use_it.js``): per facet that has alternatives, the
+    default table and each alternative with its record fields. ``None`` when
+    the node isn't a benchmark or nothing has alternatives."""
+    if not v2.is_subtype(node.type, v2.BENCHMARK):
+        return None
+    singular = {'docs': 'doc', 'queries': 'query', 'qrels': 'qrel',
+                'scoreddocs': 'scoreddoc', 'docpairs': 'docpair'}
+    facets, any_alts = [], False
+    for entity in v2.ENTITIES:
+        table = node.edge(entity)
+        if table is None:
+            continue
+        alts = _alternatives(table.qualified_name)
+        any_alts |= bool(alts)
+        options = [{'name': table.qualified_name, 'fields': _record_fields(table) or [], 'note': None}]
+        for alt in alts:
+            view = gq.node_data(store, alt)
+            options.append({'name': alt, 'fields': (view.metadata.get('columns') if view else None) or [],
+                            'note': _alt_note(alt)})
+        facets.append({'entity': entity, 'singular': singular[entity], 'options': options})
+    return {'name': node.qualified_name, 'facets': facets} if any_alts else None
+
+
 def _resource_kind(node):
     """``'git'``, ``'directory'`` or ``'file'``. The store has no explicit
     flag: a repo is identified by its ``repo`` field, a directory by a
@@ -552,6 +577,27 @@ def provider(prefix):
         rows=None)
 
 
+def _alternatives(name):
+    """Every table linked to ``name`` by ``irds:alternative_of`` in either
+    direction, transitively (``v2.alternatives`` over the materialized store
+    rather than the live graph), excluding ``name`` itself."""
+    seen, stack = {name}, [name]
+    while stack:
+        current = stack.pop()
+        for subject, kind, obj, other in gq.triples_of(store, current):
+            if kind == 'irds:alternative_of' and other not in seen:
+                seen.add(other)
+                stack.append(other)
+    return sorted(seen - {name})
+
+
+def _alt_note(name):
+    """The short ``alternative_note`` a table declares about how it differs
+    from the table it is an alternative of, or ``None``."""
+    view = gq.node_data(store, name)
+    return view.metadata.get('alternative_note') if view is not None else None
+
+
 def _related(n, triples):
     """What a node's page links to, all read off its own edges. For a Table:
     the Resource(s) it's parsed from, any Table it's derived from (plus what
@@ -559,7 +605,22 @@ def _related(n, triples):
     it belongs to. For a Suite: its member Benchmarks and nested Suites."""
     name = n.qualified_name
     out = {'sources': [], 'derived_from': [], 'filtered_by': [], 'used_by': [],
-           'suites': [], 'member_benchmarks': [], 'member_suites': [], 'members': []}
+           'suites': [], 'member_benchmarks': [], 'member_suites': [], 'members': [],
+           'alternatives': [], 'alternative_of': [], 'alternative_note': None,
+           'facet_alternatives': {}}
+    if v2.is_subtype(n.type, v2.TABLE):
+        # Direct edges only: what this table is an alternative of (with its
+        # own note on how it differs), and the tables that are alternatives of it.
+        out['alternative_of'] = [obj for subject, kind, obj, other in triples
+                                 if subject == name and kind == 'irds:alternative_of']
+        out['alternative_note'] = _alt_note(name)
+        out['alternatives'] = [(subject, _alt_note(subject)) for subject, kind, obj, other in triples
+                               if obj == name and kind == 'irds:alternative_of']
+    elif v2.is_subtype(n.type, v2.BENCHMARK):
+        for entity in v2.ENTITIES:
+            table = n.edge(entity)
+            if table is not None and (alts := _alternatives(table.qualified_name)):
+                out['facet_alternatives'][entity] = [(a, _alt_note(a)) for a in alts]
     facet_kinds = {f'irds:{e}' for e in v2.ENTITIES}
     for subject, kind, obj, other in triples:
         if subject == name and kind == 'irds:derived_from':
@@ -619,7 +680,7 @@ def node(qualified):
         template, node=n, frozen=frozen, triples=triples, raw_triples=raw_triples,
         derived=derived,
         type_labels=TYPE_LABELS, sample_table=_pretty_samples(frozen, _record_fields(n) or ()),
-        snippet=_python_snippet(n), record_fields=_record_fields(n), related=_related(n, triples),
+        snippet=_python_snippet(n), snippet_config=_snippet_config(n), record_fields=_record_fields(n), related=_related(n, triples),
         resource_kind=_resource_kind(n) if v2.is_subtype(n.type, v2.RESOURCE) else None)
 
 

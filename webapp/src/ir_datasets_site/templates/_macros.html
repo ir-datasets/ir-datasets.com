@@ -64,9 +64,20 @@
 {% endif %}
 {% endmacro %}
 
-{% macro use_it_section(snippet) %}
+{% macro use_it_section(snippet, config=none) %}
 <div class="card mt-3 spy-target" id="use-it">
   <div class="card-header"><h3 class="card-title">Use It</h3></div>
+  {% if config %}
+  <div class="card-body border-bottom py-2 d-flex flex-wrap gap-3 align-items-center" data-use-it-config='{{ config|tojson|forceescape }}'>
+    {% for facet in config.facets if facet.options|length > 1 %}
+    <label class="d-flex align-items-center gap-2 small text-secondary mb-0">{{ facet.entity }}
+      <select class="form-select form-select-sm" data-use-it-facet="{{ facet.entity }}">
+        {% for o in facet.options %}<option value="{{ o.name }}">{% if loop.first %}default {{ facet.entity }}{% else %}{{ o.name }}{% endif %}</option>{% endfor %}
+      </select>
+    </label>
+    {% endfor %}
+  </div>
+  {% endif %}
   <pre class="bg-secondary-lt p-3 overflow-auto mb-0" style="border-radius: 0"><code class="language-python">{{ snippet }}</code></pre>
 </div>
 {% endmacro %}

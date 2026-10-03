@@ -33,7 +33,6 @@
       </div>
       <div class="acq-main">
         <div class="acq-title">Tables</div>
-        <div class="acq-sub">The tables this benchmark is evaluated with.</div>
           <div class="acq-rows acq-rows-wide">
           {% for entity in ['docs', 'queries', 'qrels', 'scoreddocs', 'docpairs'] %}
           {% set table = node.edge(entity) %}
@@ -43,6 +42,14 @@
              bare-object `if` here would materialize the table just to test presence. #}
           {% set count = frozen_count(table) %}
           <div class="acq-row"><span class="acq-label">{{ entity }}</span><span><a href="{{ node_url(table.qualified_name) }}">{{ node_code(table.qualified_name) }}</a>{% if count is not none %} <span class="text-secondary">&middot; {{ '{:,}'.format(count) }}</span>{% endif %}</span></div>
+          {% if related.facet_alternatives.get(entity) %}
+          <div class="acq-row"><span class="acq-label"></span><details open class="text-secondary">
+            <summary class="small" style="font-variant: small-caps; letter-spacing: .05em; cursor: pointer">Alternatives</summary>
+            {% for alt, note in related.facet_alternatives[entity] %}
+            <div class="ms-4"><a href="{{ node_url(alt) }}">{{ node_code(alt) }}</a>{% if note %} <small>({{ note }})</small>{% endif %}</div>
+            {% endfor %}
+          </details></div>
+          {% endif %}
           {% endif %}
           {% endfor %}
           </div>
@@ -70,7 +77,7 @@
    backing edge; that provenance is instead visible on the derived facet's own
    page (follow a Tables link above), via a real edge. #}
 
-{{ m.use_it_section(snippet) }}
+{{ m.use_it_section(snippet, snippet_config) }}
 
 {{ m.triples_section(raw_triples, node.qualified_name) }}
 {% endcall %}
