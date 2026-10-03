@@ -29,8 +29,8 @@ from flask import render_template
 
 from . import graph_queries as gq
 from .app import (
-    DEFAULT_HIDDEN_PROVIDERS, TYPE_LABELS, TYPE_LABELS_PLURAL, _row_dict,
-    _selected_providers, app, store, v2,
+    DEFAULT_HIDDEN_PROVIDERS, DUMP_PATH, TYPE_LABELS, TYPE_LABELS_PLURAL,
+    _row_dict, _selected_providers, app, store, v2,
 )
 
 #: Providers excluded from a static build unless explicitly asked for (via
@@ -129,6 +129,10 @@ def build(out='dist', providers=None):
       of the pages that would reference them below, so copying them too, if
       present, is harmless, not that anything still links to them from a
       static page).
+    * ``graph.nq.gz`` -- copied as-is from alongside ``graph.db`` (see
+      app.py's DUMP_PATH), if build-graph-db wrote one, so the same download
+      link (base.html's footer) and the same URL (``/graph.nq.gz``) work
+      whether this ends up served live or as a plain static file.
 
     ``providers``: which provider-graphs to actually enumerate into node and
     provider pages (and count towards the type-filtered listings) --
@@ -180,5 +184,11 @@ def build(out='dist', providers=None):
     static_src = Path(__file__).resolve().parent / 'static'
     if static_src.is_dir():
         shutil.copytree(static_src, out_dir / 'static', dirs_exist_ok=True)
+
+    if DUMP_PATH.exists():
+        # Same URL (/graph.nq.gz) works whether this ends up served by
+        # app.py's route or, here, as a plain file -- see base.html's
+        # footer link, shared by both.
+        shutil.copyfile(DUMP_PATH, out_dir / 'graph.nq.gz')
 
     return out_dir

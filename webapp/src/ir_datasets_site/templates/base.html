@@ -54,6 +54,16 @@
         </div>
       </div>
     </div>
+    {% if graph_dump_available %}
+    <footer class="footer footer-transparent d-print-none">
+      <div class="container-xl">
+        <div class="text-center text-secondary">
+          <a href="/graph.nq.gz">Download the full graph</a> (gzipped N-Quads --
+          every node/edge/property this site shows, in a plain RDF format)
+        </div>
+      </div>
+    </footer>
+    {% endif %}
   </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@tabler/core@1/dist/js/tabler.min.js"></script>

@@ -27,7 +27,7 @@ from pathlib import Path
 
 import pyoxigraph as ox
 from markupsafe import Markup, escape
-from flask import Flask, abort, jsonify, render_template, request, url_for
+from flask import Flask, abort, jsonify, render_template, request, send_file, url_for
 
 from . import graph_queries as gq
 
@@ -56,6 +56,36 @@ except OSError:
     # to at request time) store so the app can at least start.
     store = ox.Store(str(STORE_PATH))
 gq.warm(store)
+
+#: Gzipped N-Quads dump of the whole store -- a plain, standard RDF
+#: serialization of the same quads ``graph.db`` holds in Oxigraph's own
+#: internal (RocksDB-backed, not independently readable) format, for anyone
+#: who wants the data itself rather than just browsing it. Written by
+#: build_graph_db.py's ``build()`` right alongside ``graph.db`` by default
+#: (see its ``default_dump_path``) -- served from here by ``graph_dump()``,
+#: and copied as-is into a static build's output by static_site.py.
+DUMP_PATH = STORE_PATH.with_suffix('.nq.gz')
+
+
+@app.context_processor
+def _inject_graph_dump_available():
+    """So base.html's download link (see its footer) can show up only when
+    there's actually something to download -- same ``DUMP_PATH`` check
+    whether this runs for a live request or (via static_site.py's direct
+    ``render_template()`` calls) a static build."""
+    return {'graph_dump_available': DUMP_PATH.exists()}
+
+
+@app.route('/graph.nq.gz')
+def graph_dump():
+    """The download behind base.html's footer link -- the whole store as
+    gzipped N-Quads (see DUMP_PATH). 404s with a clear hint if build-graph-db
+    hasn't been run yet (or was run with --no-dump)."""
+    if not DUMP_PATH.exists():
+        abort(404, f'{DUMP_PATH} not found -- run `ir-datasets-site build-graph-db` '
+                    f'(without --no-dump) first')
+    return send_file(DUMP_PATH, mimetype='application/gzip',
+                      as_attachment=True, download_name='graph.nq.gz')
 
 #: The top-level node categories this site knows how to render specially --
 #: used for the home page's stat cards and the browse page's type filter.

@@ -57,6 +57,20 @@ hashes and sample records only render if a manifest has been frozen.
 inside the installed package -- override with `--out`/`--store` or the
 `IR_DATASETS_SITE_STORE` environment variable if you want it elsewhere.
 
+## Downloading the graph data
+
+`graph.db` is a pyoxigraph/RocksDB directory in an internal, Oxigraph-specific
+format -- not something another tool can read directly. `build-graph-db`
+therefore also writes a plain, standard **gzipped N-Quads** dump of the exact
+same quads (same provider-partitioned named graphs) right alongside it
+(`graph.db` -> `graph.nq.gz`; override with `--dump`, or skip it with
+`--no-dump`). Both the live app and a static build serve this at the same
+URL, `/graph.nq.gz` (linked from every page's footer, once a dump exists):
+
+- **Live app**: `app.py`'s `/graph.nq.gz` route (`send_file`).
+- **Static build**: `static_site.py`'s `build()` copies it into the output
+  directory as-is, so it's just another static file there.
+
 ## Static build
 
 No live process required at all -- `ir-datasets-site build-static` renders

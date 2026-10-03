@@ -3,7 +3,7 @@
 ``app.py`` so both are reachable after a plain ``pip install`` with no need
 to locate/run those files directly.
 
-    ir-datasets-site build-graph-db [--providers irds hf clirmatrix] [--out graph.db]
+    ir-datasets-site build-graph-db [--providers irds hf clirmatrix] [--out graph.db] [--dump graph.nq.gz] [--no-dump]
     ir-datasets-site serve [--host 127.0.0.1] [--port 5000] [--store graph.db]
     ir-datasets-site build-static [--out dist] [--providers irds hf] [--store graph.db]
 """
@@ -26,6 +26,14 @@ def main(argv=None):
     build_parser.add_argument(
         '--out', default=str(bgd.DEFAULT_STORE_PATH),
         help=f'store path (default: {bgd.DEFAULT_STORE_PATH})')
+    build_parser.add_argument(
+        '--dump', default=None,
+        help='gzipped N-Quads dump path -- a plain, standard-format export of the same '
+             'quads, downloadable via app.py\'s /graph.nq.gz route or static_site.py\'s '
+             'copy of it (default: --out, with its suffix replaced by .nq.gz)')
+    build_parser.add_argument(
+        '--no-dump', dest='dump_enabled', action='store_false', default=True,
+        help="don't write the N-Quads dump at all")
 
     serve_parser = subparsers.add_parser('serve', help='run the Flask dev server')
     serve_parser.add_argument('--host', default='127.0.0.1')
@@ -53,8 +61,11 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     if args.command == 'build-graph-db':
-        n = bgd.build(providers=args.providers, out=args.out)
-        print(f'wrote {args.out}: {n} triples, providers={args.providers}')
+        dump = False if not args.dump_enabled else (args.dump or True)
+        n = bgd.build(providers=args.providers, out=args.out, dump=dump)
+        dump_path = bgd.default_dump_path(args.out) if dump is True else dump
+        print(f'wrote {args.out}: {n} triples, providers={args.providers}'
+              + (f'; dump={dump_path}' if dump else ''))
     elif args.command == 'serve':
         if args.store:
             # Must be set before app.py is imported -- it reads this env var
