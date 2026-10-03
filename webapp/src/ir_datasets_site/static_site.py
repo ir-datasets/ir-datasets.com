@@ -31,7 +31,7 @@ from tqdm import tqdm
 from . import graph_queries as gq
 from .app import (
     DEFAULT_HIDDEN_PROVIDERS, DUMP_PATH, TYPE_LABELS, TYPE_LABELS_PLURAL,
-    _row_dict, _selected_providers, app, store, v2,
+    _node_url, _row_dict, _selected_providers, app, store, v2,
 )
 
 #: Providers excluded from a static build unless explicitly asked for (via
@@ -177,10 +177,21 @@ def build(out='dist', providers=None):
                 type_labels=TYPE_LABELS, rows=rows, static_build=True)
             _write_page(out_dir, f'/provider/{prefix}', html)
 
-    with app.test_client() as client:
+    with app.test_request_context():
         names = [name for name, _type in gq.list_nodes(store, providers=selected, limit=None)[0]]
-        for name in tqdm(names, desc='node pages', unit='page'):
-            render_to_static_page(client, f'/n/{name}', out_dir)
+        # _node_url (-> url_for) percent-encodes whatever needs it (a
+        # literal space, '%', '+', ...) -- a raw f'/n/{name}' doesn't, so a
+        # name containing any of those wouldn't round-trip back to the same
+        # string once a URL parser (Werkzeug's routing here, a browser's
+        # address bar later) decodes it again. Built up front, in this one
+        # request context, rather than inside the loop below -- test_client
+        # requests each push/pop their own request context per call, which
+        # doesn't nest cleanly with one already left open around them.
+        node_urls = [(name, _node_url(name)) for name in names]
+
+    with app.test_client() as client:
+        for name, url in tqdm(node_urls, desc='node pages', unit='page'):
+            render_to_static_page(client, url, out_dir)
 
     static_src = Path(__file__).resolve().parent / 'static'
     if static_src.is_dir():
