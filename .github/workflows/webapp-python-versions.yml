@@ -1,0 +1,42 @@
+name: webapp python versions
+
+# Makes sure a plain `pip install -e ./webapp` (no Docker) still works on
+# every Python version this package claims to support (pyproject.toml's
+# requires-python >=3.9) that's currently or soon-to-be in active use, and
+# that the same two commands a fresh checkout needs work on each.
+
+on:
+  push:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      # lxml (an ir_datasets dependency) and pyoxigraph (this package's own
+      # dependency) may need to build from source rather than use a
+      # prebuilt wheel on a Python version new enough that neither has
+      # published one yet -- a Rust toolchain covers pyoxigraph's case, the
+      # apt packages cover lxml's.
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install system build dependencies
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libxml2-dev libxslt1-dev
+
+      - name: pip install -e ./webapp
+        run: pip install -e ./webapp
+
+      - name: ir-datasets-site build-graph-db --providers irds
+        run: ir-datasets-site build-graph-db --providers irds --out graph.db
+
+      - name: ir-datasets-site build-static --out dist
+        run: ir-datasets-site build-static --out dist --store graph.db
