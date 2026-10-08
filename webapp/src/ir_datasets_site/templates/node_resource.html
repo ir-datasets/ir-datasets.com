@@ -2,7 +2,6 @@
 {% import "_macros.html" as m %}
 {% block title %}{{ node.qualified_name }} &mdash; ir-datasets.com{% endblock %}
 {% block content %}
-{{ m.node_header(node) }}
 
 {% set validates = [] %}
 {% for subject, kind, object, other in triples if kind == 'irds:validated_by' and object == node.qualified_name %}
@@ -12,7 +11,7 @@
   + ([('related', 'Related Nodes')] if derived or validates else [])
   + [('use-it', 'Use It')]
   + [('raw-triples', 'Raw Triples')] %}
-{% call m.spy_layout(sections) %}
+{% call m.spy_layout(sections, node) %}
 {% set manual_sources = node.metadata.sources | default([]) | selectattr('kind', 'equalto', 'manual') | list %}
 <div class="card spy-target" id="overview">
   <div class="card-body">

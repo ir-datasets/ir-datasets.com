@@ -31,7 +31,7 @@ from tqdm import tqdm
 from . import graph_queries as gq
 from .app import (
     DEFAULT_HIDDEN_PROVIDERS, DUMP_PATH, TYPE_LABELS, TYPE_LABELS_PLURAL,
-    _node_url, _row_dict, _selected_providers, app, store, v2,
+    _node_url, _row_dict, _selected_providers, _type_graph, app, store, v2,
 )
 
 #: Providers excluded from a static build unless explicitly asked for (via
@@ -109,7 +109,7 @@ def _index_url_for(endpoint, **values):
 def _rows_for(type_filter=None, name_prefix=None, providers=None):
     rows, _total = gq.list_nodes(store, type_filter=type_filter, name_prefix=name_prefix,
                                  providers=providers, limit=None)
-    return [_row_dict(name, type_) for name, type_ in rows]
+    return [_row_dict(name, types) for name, types in rows]
 
 
 def build(out='dist', providers=None):
@@ -124,6 +124,7 @@ def build(out='dist', providers=None):
       branch (rendered directly, not through the live ``/search`` route,
       since that route always passes ``rows=None`` -- see app.py's
       ``search()``).
+    * ``/types`` and ``/type/<qualified>`` for every known node type.
     * ``/provider/<prefix>`` for every provider in ``providers`` -- same
       inlined-rows approach, via provider.html's static branch.
     * ``static/`` -- copied as-is (CSS; ``browse.js``/``nav.js`` are left out
@@ -189,8 +190,14 @@ def build(out='dist', providers=None):
         # doesn't nest cleanly with one already left open around them.
         node_urls = [(name, _node_url(name)) for name in names]
 
+    with app.test_request_context():
+        # The overview and one page per known node type (see app.py's types()/type_page()).
+        type_urls = ['/types'] + [url_for('type_page', qualified=t) for t in sorted(_type_graph()[0])]
+
     with app.test_client() as client:
         for name, url in tqdm(node_urls, desc='node pages', unit='page'):
+            render_to_static_page(client, url, out_dir)
+        for url in type_urls:
             render_to_static_page(client, url, out_dir)
 
     static_src = Path(__file__).resolve().parent / 'static'

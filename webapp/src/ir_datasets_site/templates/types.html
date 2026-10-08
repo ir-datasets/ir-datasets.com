@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}Types &mdash; ir-datasets.com{% endblock %}
+{% block content %}
+<h2 class="mb-3">Types</h2>
+<div class="card mb-3">
+  <div class="card-body">
+    <p class="mb-0">Every node in the catalog has one or more types. A type can be a more specific kind of another
+    (a <code>DocTable</code> is a <code>Table</code>), and a node can have several (a benchmark can be both an
+    <code>AdhocBenchmark</code> and a <code>QaBenchmark</code>). Counts include subtypes.</p>
+  </div>
+</div>
+<div class="card">
+  <div class="list-group list-group-flush">
+    {% for entry in roots %}{{ m.type_tree(entry, 0) }}{% endfor %}
+  </div>
+</div>
+{% endblock %}

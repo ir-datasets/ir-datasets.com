@@ -51,27 +51,31 @@ code {
    stat cards -- see app.py's TYPE_COLOR_SLUGS/_type_color. "default" covers
    an unrecognized (future third-party) type. */
 :root {
-  --cat-resource: #8D6300;
-  --cat-table: #00786B;
-  --cat-benchmark: #C7303C;
-  --cat-suite: #925977;
+  --cat-resource: #004E8C;
+  --cat-table: #9A6700;
+  --cat-bundle: #9D174D;
+  --cat-benchmark: var(--cat-bundle);
+  --cat-suite: var(--cat-bundle);
   --cat-default: #667382;
 }
 
 .text-cat-resource { color: var(--cat-resource) !important; }
 .text-cat-table { color: var(--cat-table) !important; }
+.text-cat-bundle { color: var(--cat-bundle) !important; }
 .text-cat-benchmark { color: var(--cat-benchmark) !important; }
 .text-cat-suite { color: var(--cat-suite) !important; }
 .text-cat-default { color: var(--cat-default) !important; }
 
 .border-cat-resource { border-color: var(--cat-resource) !important; }
 .border-cat-table { border-color: var(--cat-table) !important; }
+.border-cat-bundle { border-color: var(--cat-bundle) !important; }
 .border-cat-benchmark { border-color: var(--cat-benchmark) !important; }
 .border-cat-suite { border-color: var(--cat-suite) !important; }
 .border-cat-default { border-color: var(--cat-default) !important; }
 
 .badge-cat-resource, a.badge-cat-resource { background: var(--cat-resource); color: #fff; }
 .badge-cat-table, a.badge-cat-table { background: var(--cat-table); color: #fff; }
+.badge-cat-bundle, a.badge-cat-bundle { background: var(--cat-bundle); color: #fff; }
 .badge-cat-benchmark, a.badge-cat-benchmark { background: var(--cat-benchmark); color: #fff; }
 .badge-cat-suite, a.badge-cat-suite { background: var(--cat-suite); color: #fff; }
 .badge-cat-default, a.badge-cat-default { background: var(--cat-default); color: #fff; }
@@ -83,6 +87,7 @@ code {
    rather than through a template) with no per-call-site wiring needed. */
 .badge-cat-resource::before,
 .badge-cat-table::before,
+.badge-cat-bundle::before,
 .badge-cat-benchmark::before,
 .badge-cat-suite::before {
   content: '';
@@ -99,11 +104,10 @@ code {
 .badge-cat-table::before {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='white'%3E%3Cpath stroke='none' d='M0 0h24v24H0z' fill='none'/%3E%3Cpath d='M4 11h4a1 1 0 0 1 1 1v8a1 1 0 0 1 -1 1h-2a3 3 0 0 1 -2.995 -2.824l-.005 -.176v-6a1 1 0 0 1 1 -1z'/%3E%3Cpath d='M21 12v6a3 3 0 0 1 -2.824 2.995l-.176 .005h-6a1 1 0 0 1 -1 -1v-8a1 1 0 0 1 1 -1h8a1 1 0 0 1 1 1z'/%3E%3Cpath d='M18 3a3 3 0 0 1 2.995 2.824l.005 .176v2a1 1 0 0 1 -1 1h-8a1 1 0 0 1 -1 -1v-4a1 1 0 0 1 1 -1h6z'/%3E%3Cpath d='M9 4v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1v-2a3 3 0 0 1 2.824 -2.995l.176 -.005h2a1 1 0 0 1 1 1z'/%3E%3C/svg%3E");
 }
-.badge-cat-benchmark::before {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath stroke='none' d='M0 0h24v24H0z' fill='none'/%3E%3Cpath d='M17 3l4 4l-14 14l-4 -4l14 -14'/%3E%3Cpath d='M16 7l-1.5 -1.5'/%3E%3Cpath d='M13 10l-1.5 -1.5'/%3E%3Cpath d='M10 13l-1.5 -1.5'/%3E%3Cpath d='M7 16l-1.5 -1.5'/%3E%3C/svg%3E");
-}
+.badge-cat-bundle::before,
+.badge-cat-benchmark::before,
 .badge-cat-suite::before {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath stroke='none' d='M0 0h24v24H0z' fill='none'/%3E%3Cpath d='M7.05 11.293l4.243 -4.243a2 2 0 0 1 2.828 0l2.829 2.83a2 2 0 0 1 0 2.828l-4.243 4.243a2 2 0 0 1 -2.828 0l-2.829 -2.831a2 2 0 0 1 0 -2.828'/%3E%3Cpath d='M16.243 9.172l3.086 -.772a1.5 1.5 0 0 0 .697 -2.516l-2.216 -2.217a1.5 1.5 0 0 0 -2.44 .47l-1.248 2.913'/%3E%3Cpath d='M9.172 16.243l-.772 3.086a1.5 1.5 0 0 1 -2.516 .697l-2.217 -2.216a1.5 1.5 0 0 1 .47 -2.44l2.913 -1.248'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath stroke='none' d='M0 0h24v24H0z' fill='none'/%3E%3Cpath d='M12 4l-8 4l8 4l8 -4l-8 -4'/%3E%3Cpath d='M4 12l8 4l8 -4'/%3E%3Cpath d='M4 16l8 4l8 -4'/%3E%3C/svg%3E");
 }
 
 /* subject --edge--> object rows (triples_section macro): one grid shared by
@@ -274,6 +278,7 @@ pre code.hljs { background: transparent; padding: 0; }
   background: color-mix(in srgb, var(--cat-resource) 15%, transparent);
   color: var(--cat-resource);
 }
+.acq-icon-bundle,
 .acq-icon-benchmark {
   background: color-mix(in srgb, var(--cat-benchmark) 15%, transparent);
   color: var(--cat-benchmark);
@@ -305,3 +310,51 @@ h2 > .badge.badge-sm { top: -2px; }
 .sample-table th, .sample-table td:first-child { white-space: nowrap; }
 .sample-cell { max-width: 32rem; min-width: 4rem; width: max-content; white-space: normal; overflow-wrap: anywhere; }
 .sample-table td { vertical-align: top; }
+
+/* Type filter tags input (Tom Select, see search.html / browse.js): each
+   selected type is a badge-cat-* badge (type color + icon). Tom Select's own
+   theme colors its items, so re-assert the badge colors with higher
+   specificity. */
+.ts-wrapper.multi .ts-control > .item.badge {
+  padding: .2rem .35rem .2rem .5rem;
+  margin: 0 .25rem .25rem 0;
+  border: 0;
+  color: #fff;
+}
+.ts-wrapper.multi .ts-control > .item.badge-cat-resource { background: var(--cat-resource); }
+.ts-wrapper.multi .ts-control > .item.badge-cat-table { background: var(--cat-table); }
+.ts-wrapper.multi .ts-control > .item.badge-cat-bundle { background: var(--cat-bundle); }
+.ts-wrapper.multi .ts-control > .item.badge-cat-benchmark { background: var(--cat-benchmark); }
+.ts-wrapper.multi .ts-control > .item.badge-cat-suite { background: var(--cat-suite); }
+.ts-wrapper.multi .ts-control > .item.badge-cat-default { background: var(--cat-default); }
+.ts-wrapper.multi .ts-control > .item.badge .remove {
+  border: 0;
+  padding: 0 .25rem;
+  margin-left: .1rem;
+  color: #fff;
+  opacity: .8;
+  background: transparent;
+}
+.ts-wrapper.multi .ts-control > .item.badge .remove:hover { opacity: 1; background: transparent; }
+
+/* White backgrounds for the type filter's input and its dropdown (Tom Select's
+   theme otherwise inherits the page's gray). */
+.ts-wrapper .ts-control,
+.ts-wrapper.focus .ts-control,
+.ts-dropdown,
+.ts-dropdown .ts-dropdown-content {
+  background-color: #fff;
+}
+
+/* Relevance Labels (node_table.html): icon + title/subtitle on one row, the
+   table on its own full-width row below. */
+.acq-levels { flex-wrap: wrap; row-gap: .5rem; }  /* tighter than .acq's 1rem gap above the table */
+.acq-levels .acq-levels-table { flex: 0 0 100%; }
+.acq-levels .acq-main { flex: 1 1 0; }
+.acq-levels .acq-levels-table {
+  /* edge to edge of the card: undo the card body's side padding */
+  flex: 0 0 calc(100% + 2 * var(--tblr-card-spacer-x, 1.25rem));
+  /* ...and the bottom padding too: the table is the last thing in its card */
+  margin: 0 calc(-1 * var(--tblr-card-spacer-x, 1.25rem)) calc(-1 * var(--tblr-card-spacer-y, 1.25rem));
+  border-top: 1px solid var(--tblr-border-color);
+}

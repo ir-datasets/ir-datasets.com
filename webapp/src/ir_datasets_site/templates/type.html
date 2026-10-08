@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}{{ entry.name }} &mdash; ir-datasets.com{% endblock %}
+{% block content %}
+<h2 class="mb-3">
+  <span class="select">{{ node_code(entry.name) }}</span>
+  <span class="badge badge-sm align-middle {{ entry.badge_class }}">{{ entry.label }}</span>
+</h2>
+<p class="text-secondary"><a href="{{ url_for('types') }}">All types</a>{% for a in ancestors %} &rsaquo; <a href="{{ a.url }}">{{ node_code(a.name) }}</a>{% endfor %} &rsaquo; {{ node_code(entry.name) }}</p>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <p>{{ (entry.desc or 'No description.')|inline_code }}</p>
+    <div class="acq-rows">
+      <div class="acq-row"><span class="acq-label">Nodes</span><span>{{ '{:,}'.format(entry.count) }}{% if entry.children %} <span class="text-secondary">(including subtypes)</span>{% endif %}</span></div>
+      {% if entry.children %}
+      <div class="acq-row"><span class="acq-label">Subtypes</span><span>
+        {% for c in entry.children %}<a href="{{ c.url }}">{{ node_code(c.name) }}</a> <span class="text-secondary">&middot; {{ '{:,}'.format(c.count) }}</span>{% if not loop.last %}<br>{% endif %}{% endfor %}
+      </span></div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% if protocol %}
+<div class="card mb-3">
+  <div class="card-header"><h3 class="card-title">Protocol</h3>
+    <div class="card-actions text-secondary"><code>{{ protocol.ref }}</code>{% if protocol.inherited %} &middot; inherited from <a href="{{ url_for('type_page', qualified=protocol.declared_on) }}">{{ node_code(protocol.declared_on) }}</a>{% endif %}</div>
+  </div>
+  <div class="card-body">
+    <p class="text-secondary">Every node of this type satisfies <code>{{ protocol.name }}</code>: it has these members, and none are required beyond them{% if protocol.bases %} and those of the protocols it extends, shown below{% endif %}.</p>
+    {% if protocol.source %}
+    <pre class="bg-secondary-lt p-3 overflow-auto mb-0"><code class="language-python">{{ protocol.source }}</code></pre>
+    {% for base in protocol.bases %}
+    <details class="mt-3" {% if loop.first %}open{% endif %}>
+      <summary class="text-secondary">Extends <code>{{ base.name }}</code></summary>
+      <pre class="bg-secondary-lt p-3 overflow-auto mt-2 mb-0"><code class="language-python">{{ base.source }}</code></pre>
+    </details>
+    {% endfor %}
+    {% else %}
+    <p class="mb-0">Its definition isn't available here (the package that declares it isn't installed).</p>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{% if rows %}
+<div class="card">
+  <div class="card-header"><h3 class="card-title">Nodes</h3>
+    {% if total > shown %}<div class="card-actions text-secondary">first {{ shown }} of {{ '{:,}'.format(total) }} &middot; <a href="{{ url_for('search', type=entry.name) }}">browse all</a></div>{% endif %}
+  </div>
+  <div class="list-group list-group-flush">
+    {{ m.browse_rows(rows) }}
+  </div>
+</div>
+{% endif %}
+{% endblock %}

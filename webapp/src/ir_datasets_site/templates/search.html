@@ -22,12 +22,13 @@
         {% endfor %}
       </div>
       {% else %}
-      <select data-browse-type class="form-select">
-        <option value="">all types</option>
-        {% for type, label in type_filter_labels.items() %}
-        <option value="{{ type }}" {% if type == type_filter %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
+      {#- Tags input (Tabler's form-elements "Tags" example, i.e. Tom Select):
+         pick any number of types; a node matches if it has any of them (or
+         a subtype). Each tag/option is a badge in the type's own color and
+         icon (see static/style.css's badge-cat-*). static/browse.js
+         initializes it from data-options. #}
+      <input type="text" data-browse-type class="form-control" value="{{ selected_types|join(',') }}"
+             placeholder="All types" data-options='{{ type_options|tojson|forceescape }}'>
       {% endif %}
     </div>
     {% if rows is none %}

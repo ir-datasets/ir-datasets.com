@@ -7,15 +7,26 @@
 {% for row in rows %}
 <div class="list-group-item py-1 d-flex align-items-center">
   <a href="{{ row.url }}"><code>{% set i = row.name.find(':') %}<span class="text-secondary">{{ row.name[:i + 1] if i != -1 else '' }}</span><span>{{ row.name[i + 1:] if i != -1 else row.name }}</span></code></a>
-  <span class="badge badge-sm align-middle ms-1 {{ row.badge_class }}">{{ row.type_label }}</span>
+  {% for b in row.badges %}<span class="badge badge-sm align-middle ms-1 {{ b.badge_class }}">{{ b.label }}</span>{% endfor %}
 </div>
 {% endfor %}
+{% endmacro %}
+
+{% macro type_tree(entry, depth) %}
+<div class="list-group-item py-2" style="padding-left: {{ 1 + depth * 1.75 }}rem">
+  <div class="d-flex align-items-center">
+    <a href="{{ entry.url }}">{{ node_code(entry.name) }}</a>
+    <span class="badge badge-sm align-middle ms-2 {{ entry.badge_class }}">{{ entry.label }}</span>
+    <span class="ms-auto text-secondary">{{ '{:,}'.format(entry.count) }}</span>
+  </div>
+  {% if entry.desc %}<div class="text-secondary small">{{ entry.desc }}</div>{% endif %}
+</div>
+{% for child in entry.children %}{{ type_tree(child, depth + 1) }}{% endfor %}
 {% endmacro %}
 
 {% macro node_header(node) %}
 <h2 class="mb-3">
   <code class="select"><a href="{{ url_for('provider', prefix=provider_of(node.qualified_name)) }}" class="text-secondary">{{ provider_of(node.qualified_name) }}:</a>{{ node.qualified_name.split(':', 1)[1] }}</code>
-  <span class="badge badge-sm align-middle {{ type_badge_class(node.type) }}">{{ type_label(node.type) }}</span>
 </h2>
 {% if node.metadata.deprecated %}
 <div class="alert alert-warning">{{ node.metadata.deprecated }}</div>
@@ -86,7 +97,8 @@
    section is an (id, label) pair naming a ``.spy-target`` card; the
    row carries Bootstrap's data-bs-spy attributes (default ScrollSpy). Use as
    ``{% call m.spy_layout(sections) %}...cards...{% endcall %}``. #}
-{% macro spy_layout(sections) %}
+{#- ``node``: when given, its title (node_header) is the first thing in the main column, beside the nav. #}
+{% macro spy_layout(sections, node=none) %}
 <div class="row g-4" data-bs-spy="scroll" data-bs-target="#spy-nav" data-bs-smooth-scroll="true">
   <div class="col-lg-2 d-none d-lg-block">
     <div class="sticky-top spy-menu">
@@ -95,16 +107,16 @@
       </nav>
     </div>
   </div>
-  <div class="col-lg-10">{{ caller() }}</div>
+  <div class="col-lg-10">{% if node is not none %}{{ node_header(node) }}{% endif %}{{ caller() }}</div>
 </div>
 {% endmacro %}
 
 {# The node's citation(s), as a detail row in its first Overview box. A node
    may cite several papers (``citation`` is a list in the graph); a ``dblp:``
-   key links to its official dblp.org record. #}
+   key links to its official dblp.org record, a ``doi:`` one to doi.org. #}
 {% macro citation_row(node) %}
 {% if node.metadata.citation %}
-          <div class="acq-row"><span class="acq-label">Citation</span><span>{% for c in node.metadata.citation %}{% if not loop.first %}<br>{% endif %}{% if c.startswith('dblp:') %}<a href="https://dblp.org/rec/{{ c[5:] }}.html?view=bibtex" target="_blank" rel="noopener"><code>{{ c }}</code></a>{% elif node_exists(c) %}<a href="{{ node_url(c) }}">{{ node_code(c) }}</a>{% else %}<code>{{ c }}</code>{% endif %}{% endfor %}</span></div>
+          <div class="acq-row"><span class="acq-label">Citation</span><span>{% for c in node.metadata.citation %}{% if not loop.first %}<br>{% endif %}{% if c.startswith('dblp:') %}<a href="https://dblp.org/rec/{{ c[5:] }}.html?view=bibtex" target="_blank" rel="noopener"><code>{{ c }}</code></a>{% elif c.startswith('doi:') %}<a href="https://doi.org/{{ c[4:] }}" target="_blank" rel="noopener"><code>{{ c }}</code></a>{% elif node_exists(c) %}<a href="{{ node_url(c) }}">{{ node_code(c) }}</a>{% else %}<code>{{ c }}</code>{% endif %}{% endfor %}</span></div>
 {% endif %}
 {% endmacro %}
 
@@ -131,7 +143,7 @@
 
 {# First row of the Overview box: the node's type, as its badge. #}
 {% macro type_row(node) %}
-          <div class="acq-row"><span class="acq-label">Type</span><span><span class="badge badge-sm {{ type_badge_class(node.type) }}">{{ type_label(node.type) }}</span></span></div>
+          <div class="acq-row"><span class="acq-label">Type</span><span>{% for t in node_types(node) %}<a href="{{ url_for('type_page', qualified=t) }}" class="badge badge-sm {{ type_badge_class(t) }}">{{ type_label(t) }}</a> {% endfor %}</span></div>
 {% endmacro %}
 
 {# A language literal (``lang2:zh`` ISO 639-1, ``lang3:zho`` ISO 639-3) as a link

@@ -30,6 +30,7 @@ from markupsafe import Markup, escape
 from flask import Flask, abort, jsonify, render_template, request, send_file, url_for
 
 from . import graph_queries as gq
+from ir_datasets.v2.vocabulary import protocol_of as vocabulary_protocol_of
 
 try:
     import ir_datasets.v2 as v2
@@ -91,31 +92,31 @@ def graph_dump():
 #: used for the home page's stat cards and the browse page's type filter.
 #: ``irds:Table`` is itself a real (registerable) type, but every concrete
 #: table node in the catalog is actually one of its five subtypes
-#: (``irds:DocTable``, ``irds:QrelTable``, ...) -- see ``ir_datasets.v2.nodes``'s
+#: (``irds:Docs``, ``irds:Qrels``, ...) -- see ``ir_datasets.v2.nodes``'s
 #: ``TABLE_TYPES``. Grouping by category below is therefore always done via
 #: ``graph_queries``'s stored ``subClassOf`` closure, never exact-``==``
 #: against a node's own (more specific) type. A type not in here at all (a
 #: future third-party provider's own vocabulary with no matching parent)
 #: still gets a page -- see node_generic.html -- just a plainer one.
 TYPE_LABELS = {
-    v2.RESOURCE: 'Resource',
+    v2.DATA: 'Data',
     v2.TABLE: 'Table',
     v2.BENCHMARK: 'Benchmark',
     v2.SUITE: 'Suite',
+    v2.BUNDLE: 'Bundle',
 }
 
 #: Same vocabulary, plural -- for a category listing (the home page's stat
 #: cards: "12 Tables", not "12 Table"), never for a single node's own badge
 #: (`type_label`/`TYPE_LABELS` stays singular for that).
 TYPE_LABELS_PLURAL = {
-    v2.RESOURCE: 'Resources',
+    v2.DATA: 'Data',
     v2.TABLE: 'Tables',
-    v2.BENCHMARK: 'Benchmarks',
-    v2.SUITE: 'Suites',
+    v2.BUNDLE: 'Bundles',
 }
 
 TEMPLATE_BY_TYPE = {
-    v2.RESOURCE: 'node_resource.html',
+    v2.DATA: 'node_resource.html',
     v2.TABLE: 'node_table.html',
     v2.BENCHMARK: 'node_benchmark.html',
     v2.SUITE: 'node_suite.html',
@@ -139,10 +140,11 @@ TEMPLATE_BY_EXACT_TYPE = {
 #: CSS class family defined in static/style.css (Tabler has no utility
 #: classes for arbitrary hex colors).
 TYPE_COLOR_SLUGS = {
-    v2.RESOURCE: 'resource',
+    v2.DATA: 'resource',
     v2.TABLE: 'table',
-    v2.BENCHMARK: 'benchmark',
-    v2.SUITE: 'suite',
+    v2.BENCHMARK: 'bundle',
+    v2.SUITE: 'bundle',
+    v2.BUNDLE: 'bundle',
 }
 #: An unrecognized (future third-party) type still gets a color, just a
 #: neutral one -- see _category_of.
@@ -233,7 +235,7 @@ def _frozen_count(table):
 
 #: Longest cell text shown in the sample-records table; the rest is elided
 #: (a web document can be megabytes).
-_SAMPLE_CELL_MAX = 500
+_SAMPLE_CELL_MAX = 200
 
 
 def _sample_cell(value):
@@ -243,11 +245,18 @@ def _sample_cell(value):
     text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
     if len(text) <= _SAMPLE_CELL_MAX:
         return text
-    return f'{text[:_SAMPLE_CELL_MAX]}\u2026 [{len(text) - _SAMPLE_CELL_MAX:,} more characters]'
+    # Elided text stays in the page (hidden) so the "[N more characters]" link
+    # can expand it in place -- see static/sample.js.
+    head, rest = text[:_SAMPLE_CELL_MAX], text[_SAMPLE_CELL_MAX:]
+    return Markup(
+        f'{escape(head)}<span data-sample-rest hidden>{escape(rest)}</span>'
+        f'<span data-sample-ellipsis>\u2026</span> '
+        f'<a href="#" class="text-secondary text-nowrap" data-sample-expand>[+{len(rest):,} chars]</a>')
 
 
 def _pretty_samples(frozen, fields=()):
-    """Frozen sample rows are canonical JSON *strings* (keys sorted); re-parse
+    """Frozen sample rows are records (graph store) or canonical JSON *strings*
+    (manifest rows, keys sorted); parse
     into ``(columns, rows)`` for a table: columns follow the table's declared
     field order (``fields``) with any extra keys after, rows are
     ``(record index, [cell text, ...])``. Where the sampled indices skip, a
@@ -255,10 +264,15 @@ def _pretty_samples(frozen, fields=()):
     import json
     records = []
     for idx, line in sorted(frozen.get('samples', {}).items(), key=lambda kv: int(kv[0])):
-        try:
-            record = json.loads(line)
-        except (TypeError, ValueError):
-            record = None
+        # A record object (graph store: samples_json holds the records
+        # themselves) or its canonical JSON string (a manifest row).
+        if isinstance(line, dict):
+            record = line
+        else:
+            try:
+                record = json.loads(line)
+            except (TypeError, ValueError):
+                record = None
         records.append((idx, record if isinstance(record, dict) else {'record': line}))
     present = {k for _, r in records for k in r}
     columns = [f for f in fields if f in present]
@@ -285,7 +299,7 @@ def _python_snippet(node):
     name = node.qualified_name
     if v2.is_subtype(node.type, v2.BENCHMARK):
         singular = {'docs': 'doc', 'queries': 'query', 'qrels': 'qrel',
-                    'scoreddocs': 'scoreddoc', 'docpairs': 'docpair'}
+                    'scoreddocs': 'scoreddoc', 'docpairs': 'docpair', 'answers': 'answer'}
         lines = ["import ir_datasets.v2", f"ds = ir_datasets.v2.load({name!r})"]
         for entity in v2.ENTITIES:
             table = node.edge(entity)
@@ -302,7 +316,7 @@ def _python_snippet(node):
                 f"len(table)  # record count\n"
                 f"table[0]  # first record\n"
                 f"for record in table: ...")
-    if v2.is_subtype(node.type, v2.RESOURCE):
+    if v2.is_subtype(node.type, v2.DATA):
         return _resource_snippet(node)
     return f"import ir_datasets.v2\nnode = ir_datasets.v2.load({name!r})"
 
@@ -315,7 +329,7 @@ def _snippet_config(node):
     if not v2.is_subtype(node.type, v2.BENCHMARK):
         return None
     singular = {'docs': 'doc', 'queries': 'query', 'qrels': 'qrel',
-                'scoreddocs': 'scoreddoc', 'docpairs': 'docpair'}
+                'scoreddocs': 'scoreddoc', 'docpairs': 'docpair', 'answers': 'answer'}
     facets, any_alts = [], False
     for entity in v2.ENTITIES:
         table = node.edge(entity)
@@ -394,7 +408,7 @@ def _type_label(t):
     if t in TYPE_LABELS:
         return TYPE_LABELS[t]
     # A more specific type than the four categories above (e.g.
-    # ``irds:QrelTable``, or a third-party ``ext:MyTable``) -- its own bare
+    # ``irds:Qrels``, or a third-party ``ext:MyTable``) -- its own bare
     # name is already a readable label (types are named like their Python
     # class), so strip the provider prefix rather than showing the raw
     # qualified string or collapsing it to its category's generic label.
@@ -412,6 +426,27 @@ def _node_exists(name):
 app.jinja_env.globals['node_url'] = _node_url
 app.jinja_env.globals['node_exists'] = _node_exists
 app.jinja_env.globals['type_label'] = _type_label
+
+
+_RST_CODE = re.compile(r'``(.+?)``')
+
+
+def _inline_code(text):
+    """Escape ``text`` and turn reStructuredText ``literals`` (as docstrings
+    write them) into ``<code>``."""
+    return Markup(_RST_CODE.sub(lambda m: f'<code>{m.group(1)}</code>', str(escape(text or ''))))
+
+
+app.jinja_env.filters['inline_code'] = _inline_code
+
+
+def _node_types(node):
+    """Every type of a node (a live ``Node``'s or a store ``NodeView``'s):
+    ``node.types`` when it has several, else just ``[node.type]``."""
+    return list(getattr(node, 'types', None) or [node.type])
+
+
+app.jinja_env.globals['node_types'] = _node_types
 app.jinja_env.globals['type_badge_class'] = _type_badge_class
 app.jinja_env.globals['type_color'] = _type_color
 def _node_code(name, cls=''):
@@ -431,7 +466,7 @@ def _node_code(name, cls=''):
 app.jinja_env.globals['node_code'] = _node_code
 app.jinja_env.globals['provider_of'] = lambda name: name.split(':', 1)[0]
 def _score_rows(node, frozen):
-    """Rows ``(score, meaning, count)`` for the Relevance Levels table: every
+    """Rows ``(score, meaning, count)`` for the Relevance Labels table: every
     score the table defines (``defs``) or that occurs in its frozen
     ``score_counts``, ordered numerically. ``meaning``/``count`` are None where
     the table doesn't define the score / hasn't been verified yet."""
@@ -472,13 +507,41 @@ def index():
     fake-navigates there too (see static/nav.js). Stat-card counts respect
     the provider-filter default (everything except CLIRMatrix -- there are
     no checkboxes here to override it, unlike /search)."""
-    counts = gq.counts_by_type(store, list(TYPE_LABELS), providers=_selected_providers())
+    counts = gq.counts_by_type(store, list(TYPE_LABELS_PLURAL), providers=_selected_providers())
     return render_template(
         'index.html', counts=counts, has_sidebar=False,
         # irds sorts first (the original, primary provider), same as
         # graph_queries.available_providers.
         providers=sorted(v2.graph.providers, key=lambda p: (p != 'irds', p)),
         type_labels=TYPE_LABELS_PLURAL)
+
+
+def _type_args():
+    """The selected type filter(s): repeated ``?type=`` params (also accepting
+    comma-separated values), in order, no duplicates."""
+    out = []
+    for value in request.args.getlist('type'):
+        for t in value.split(','):
+            if t and t not in out:
+                out.append(t)
+    return out
+
+
+def _ordered_types(parents, children):
+    """Every known type, depth-first: the core roots first (Resource, Table,
+    Bundle), then every other root, each followed by its subtypes."""
+    first = [v2.DATA, v2.TABLE, v2.BUNDLE]
+    roots = [t for t in first if t in parents] + sorted(
+        t for t, parent in parents.items() if parent is None and t not in first)
+    out = []
+
+    def walk(t):
+        out.append(t)
+        for c in children.get(t, []):
+            walk(c)
+    for t in roots:
+        walk(t)
+    return out
 
 
 @app.route('/search')
@@ -489,18 +552,24 @@ def search():
     real link (a stat card, a provider page). Unlike the home page, this one
     has the Type/Provider filter sidebar."""
     selected = _selected_providers()
-    type_filter = request.args.get('type') or ''
+    selected_types = _type_args()
+    type_filter = selected_types[0] if selected_types else ''
     query = request.args.get('q') or ''
     regex = request.args.get('regex') in ('1', 'true')
+    parents, children, _ = _type_graph()
+    # Every known type, as options for the Type tags input (value, label, badge classes).
+    type_options = [{'value': t, 'label': _type_label(t), 'badge_class': _type_badge_class(t),
+                     'desc': _type_description(t) or ''}
+                    for t in _ordered_types(parents, children)]
     # Server-rendered so the Filters card's own count shows on first paint,
     # not just after static/browse.js's first /api/browse response lands
     # (limit=0: this route only wants the total, not any rows).
-    _, total = gq.list_nodes(store, type_filter=type_filter or None, query=query or None,
+    _, total = gq.list_nodes(store, type_filter=selected_types or None, query=query or None,
                              providers=selected, limit=0, regex=regex)
     return render_template(
         'search.html', has_sidebar=True,
         type_filter_labels=TYPE_LABELS,
-        type_filter=type_filter,
+        type_filter=type_filter, selected_types=selected_types, type_options=type_options,
         query=query,
         regex=regex,
         available_providers=gq.available_providers(store),
@@ -512,12 +581,16 @@ def search():
         rows=None, static_search_url=None)
 
 
-def _row_dict(name, type_):
+def _row_dict(name, types):
     """One /api/browse row's JSON shape -- also reused, unchanged, by
     static_site.py's build() to pre-render the same rows inline (no live
     /api/browse call possible from a static export)."""
-    return {'name': name, 'type_label': _type_label(type_), 'type': type_,
-            'badge_class': _type_badge_class(type_),
+    types = list(types)
+    return {'name': name, 'type_label': _type_label(types[0]), 'type': types[0],
+            'badge_class': _type_badge_class(types[0]),
+            # Every type the node has (usually one) -- one badge each.
+            'badges': [{'label': _type_label(t), 'badge_class': _type_badge_class(t)}
+                       for t in types],
             'url': _node_url(name), 'provider': name.split(':', 1)[0],
             'provider_url': url_for('provider', prefix=name.split(':', 1)[0])}
 
@@ -538,7 +611,7 @@ def api_browse():
     CLIRMatrix is hidden everywhere else."""
     query = (request.args.get('q') or '').strip() or None
     regex = request.args.get('regex') in ('1', 'true')
-    type_filter = request.args.get('type') or None
+    type_filter = _type_args() or None
     name_prefix = request.args.get('prefix') or None
     try:
         offset = max(0, int(request.args.get('offset', 0)))
@@ -553,9 +626,98 @@ def api_browse():
                                 name_prefix=name_prefix, providers=_selected_providers(scope=scope),
                                 limit=limit, offset=offset, regex=regex)
     return jsonify({
-        'rows': [_row_dict(name, type_) for name, type_ in rows],
+        'rows': [_row_dict(name, types) for name, types in rows],
         'total': total, 'offset': offset, 'limit': limit,
     })
+
+
+def _type_description(t):
+    """The ``desc`` a provider declared for node type ``t`` (``None`` if none, or
+    its provider isn't installed) -- not stored in the graph, so read from the
+    in-process vocabulary."""
+    return (v2.node_types().get(t) or {}).get('desc')
+
+
+def _type_graph():
+    """``(parents, children, counts)`` for every known type -- shared by
+    the overview and each type's own page."""
+    declared = {t: info.get('parent') for t, info in v2.node_types().items()}
+    parents, children, _ = gq.type_hierarchy(store, declared)
+    return parents, children, gq.counts_per_type(store, parents, providers=_selected_providers())
+
+
+def _type_entry(t, parents, children, counts):
+    return {'name': t, 'label': _type_label(t), 'badge_class': _type_badge_class(t),
+            'desc': _type_description(t), 'count': counts.get(t, 0),
+            'url': url_for('type_page', qualified=t),
+            'children': [_type_entry(c, parents, children, counts) for c in children.get(t, [])]}
+
+
+@app.route('/types')
+def types():
+    """Every node type, as a tree (a type under its parent), each with its
+    short description and how many nodes have it (counting subtypes)."""
+    parents, children, counts = _type_graph()
+    roots = [t for t in _ordered_types(parents, children) if parents.get(t) is None]
+    return render_template('types.html', roots=[_type_entry(t, parents, children, counts) for t in roots])
+
+
+def _protocol_info(t):
+    """What node type ``t`` promises, for its type page: the protocol declared on
+    it or its closest ancestor (``irds.node_type(..., protocol=...)``), as
+    ``{'ref', 'name', 'declared_on', 'inherited', 'source', 'bases'}``, or
+    ``None`` if none is declared. ``source`` is the protocol's full class
+    definition -- name, base protocols, docstrings and comments included -- and
+    ``bases`` lists the protocols it extends (nearest first), each with its own
+    ``source``, since their members are part of the promise too. A protocol that
+    can't be imported here (a third-party type's, not installed) still reports
+    its reference, with no source."""
+    import importlib
+    import inspect
+    import typing
+    ref, declared_on = vocabulary_protocol_of(t)
+    if ref is None:
+        return None
+    module, _, qualname = ref.partition(':')
+    info = {'ref': ref, 'name': qualname, 'module': module, 'declared_on': declared_on,
+            'inherited': declared_on != t, 'source': None, 'bases': []}
+    try:
+        cls = getattr(importlib.import_module(module), qualname)
+        info['source'] = inspect.getsource(cls)
+    except (ImportError, AttributeError, OSError, TypeError):
+        return info
+    for base in cls.__mro__[1:]:
+        if base is typing.Protocol or not getattr(base, '_is_protocol', False):
+            continue
+        try:
+            info['bases'].append({'name': base.__name__, 'source': inspect.getsource(base)})
+        except (OSError, TypeError):
+            pass
+    return info
+
+
+#: How many of a type's nodes its own page lists inline (the rest are one
+#: click away in the filterable /search listing).
+TYPE_PAGE_ROWS = 100
+
+
+@app.route('/type/<path:qualified>')
+def type_page(qualified):
+    parents, children, counts = _type_graph()
+    if qualified not in parents:
+        abort(404, f'{qualified!r} is not a known node type')
+    ancestors, cur = [], parents.get(qualified)
+    while cur is not None and cur not in ancestors:
+        ancestors.append(cur)
+        cur = parents.get(cur)
+    rows, total = gq.list_nodes(store, type_filter=qualified, providers=_selected_providers(),
+                                limit=TYPE_PAGE_ROWS)
+    return render_template(
+        'type.html', entry=_type_entry(qualified, parents, children, counts),
+        protocol=_protocol_info(qualified),
+        ancestors=[{'name': a, 'label': _type_label(a), 'url': url_for('type_page', qualified=a)}
+                   for a in reversed(ancestors)],
+        rows=[_row_dict(name, ts) for name, ts in rows], total=total, shown=len(rows))
 
 
 @app.route('/provider/<prefix>')
@@ -575,48 +737,6 @@ def provider(prefix):
         # See search()'s matching comment -- only static_site.py's build()
         # passes real rows.
         rows=None)
-
-
-def _alternatives(name):
-    """Every table linked to ``name`` by ``irds:alternative_of`` in either
-    direction, transitively (``v2.alternatives`` over the materialized store
-    rather than the live graph), excluding ``name`` itself."""
-    seen, stack = {name}, [name]
-    while stack:
-        current = stack.pop()
-        for subject, kind, obj, other in gq.triples_of(store, current):
-            if kind == 'irds:alternative_of' and other not in seen:
-                seen.add(other)
-                stack.append(other)
-    return sorted(seen - {name})
-
-
-def _alt_note(name):
-    """The short ``alternative_note`` a table declares about how it differs
-    from the table it is an alternative of, or ``None``."""
-    view = gq.node_data(store, name)
-    return view.metadata.get('alternative_note') if view is not None else None
-
-
-def _alternatives(name):
-    """Every table linked to ``name`` by ``irds:alternative_of`` in either
-    direction, transitively (``v2.alternatives`` over the materialized store
-    rather than the live graph), excluding ``name`` itself."""
-    seen, stack = {name}, [name]
-    while stack:
-        current = stack.pop()
-        for subject, kind, obj, other in gq.triples_of(store, current):
-            if kind == 'irds:alternative_of' and other not in seen:
-                seen.add(other)
-                stack.append(other)
-    return sorted(seen - {name})
-
-
-def _alt_note(name):
-    """The short ``alternative_note`` a table declares about how it differs
-    from the table it is an alternative of, or ``None``."""
-    view = gq.node_data(store, name)
-    return view.metadata.get('alternative_note') if view is not None else None
 
 
 def _alternatives(name):
@@ -667,7 +787,7 @@ def _related(n, triples):
     for subject, kind, obj, other in triples:
         if subject == name and kind == 'irds:derived_from':
             target = gq.node_data(store, obj)
-            is_resource = target is not None and v2.is_subtype(target.type, v2.RESOURCE)
+            is_resource = target is not None and v2.is_subtype(target.type, v2.DATA)
             out['sources' if is_resource else 'derived_from'].append(obj)
         elif subject == name and kind == 'irds:filtered_by':
             out['filtered_by'].append(obj)
@@ -723,7 +843,7 @@ def node(qualified):
         derived=derived,
         type_labels=TYPE_LABELS, sample_table=_pretty_samples(frozen, _record_fields(n) or ()),
         snippet=_python_snippet(n), snippet_config=_snippet_config(n), record_fields=_record_fields(n), related=_related(n, triples),
-        resource_kind=_resource_kind(n) if v2.is_subtype(n.type, v2.RESOURCE) else None)
+        resource_kind=_resource_kind(n) if v2.is_subtype(n.type, v2.DATA) else None)
 
 
 @app.after_request

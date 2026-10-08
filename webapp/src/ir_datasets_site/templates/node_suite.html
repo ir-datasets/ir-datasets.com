@@ -2,13 +2,12 @@
 {% import "_macros.html" as m %}
 {% block title %}{{ node.qualified_name }} &mdash; ir-datasets.com{% endblock %}
 {% block content %}
-{{ m.node_header(node) }}
 
 {% set members = related.member_benchmarks | length + related.member_suites | length %}
 {% set sections = [('overview', 'Overview')]
   + ([('related', 'Related Nodes')] if members else [])
   + [('raw-triples', 'Raw Triples')] %}
-{% call m.spy_layout(sections) %}
+{% call m.spy_layout(sections, node) %}
 <div class="card spy-target" id="overview">
   <div class="card-body">
 {{ m.desc_para(node) }}

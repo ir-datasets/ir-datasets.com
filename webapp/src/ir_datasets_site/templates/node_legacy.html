@@ -2,17 +2,19 @@
 {% import "_macros.html" as m %}
 {% block title %}{{ node.qualified_name }} &mdash; ir-datasets.com{% endblock %}
 {% block content %}
-{{ m.node_header(node) }}
 {% set replaced_by = [] %}
-{% for subject, kind, object, other in triples if kind == 'legacy:replaced_by' %}
+{% for subject, kind, object, other in triples if kind == 'irds:alias_of' %}
 {% set _ = replaced_by.append(object) %}
 {% endfor %}
 
 {% set sections = [('overview', 'Overview'), ('raw-triples', 'Raw Triples')] %}
-{% call m.spy_layout(sections) %}
+{% call m.spy_layout(sections, node) %}
 <div class="card spy-target" id="overview">
   <div class="card-body">
 {{ m.desc_para(node) }}
+    <div class="acq-rows mb-3">
+{{ m.type_row(node) }}
+    </div>
     <p class="mb-2">This is the ID of a dataset in an older version of the package.</p>
     {% if replaced_by %}
     <p class="mb-0">You can still load using it, but it automatically maps to its new ID:

@@ -31,9 +31,12 @@ class NodeView:
     ``type``, ``metadata``, ``entity``, ``_frozen()``) without
     ever importing/resolving the real node."""
 
-    def __init__(self, store, name, type_, metadata, frozen, entity=None):
+    def __init__(self, store, name, types, metadata, frozen, entity=None):
         self.qualified_name = name
-        self.type = type_
+        # A node may have several types (e.g. a benchmark that is both an
+        # AdhocBenchmark and a QaBenchmark); `type` is the first.
+        self.types = list(types)
+        self.type = self.types[0] if self.types else None
         self.metadata = metadata
         self.entity = entity
         self._frozen_row = frozen
@@ -56,23 +59,23 @@ class NodeView:
 #: type -> entity, the inverse of ``nodes.TABLE_TYPES`` -- derivable from the
 #: type alone, so it doesn't need its own triple.
 _ENTITY_BY_TYPE = {
-    'irds:DocTable': 'docs', 'irds:QueryTable': 'queries',
-    'irds:QrelTable': 'qrels', 'irds:RunTable': 'scoreddocs',
-    'irds:DocPairTable': 'docpairs',
+    'irds:Docs': 'docs', 'irds:Queries': 'queries',
+    'irds:Qrels': 'qrels', 'irds:AdhocRun': 'scoreddocs',
+    'irds:DocPairs': 'docpairs', 'irds:Answers': 'answers',
 }
 
 
 def node_data(store, name):
     """A ``NodeView`` built from every literal/type triple this node has, or
     ``None`` if it isn't in the store."""
-    type_ = None
+    types = []
     metadata = {}
     frozen = {}
     found = False
     for quad in store.quads_for_pattern(node_iri(name), None, None):
         found = True
         if quad.predicate == RDF_TYPE:
-            type_ = type_name(quad.object)
+            types.append(type_name(quad.object))
             continue
         field = meta_field(quad.predicate)
         if field is None:
@@ -99,8 +102,9 @@ def node_data(store, name):
                                      key=lambda s: s['order'])
     if not found:
         return None
-    return NodeView(store, name, type_, metadata, frozen,
-                    entity=_ENTITY_BY_TYPE.get(type_))
+    types.sort()  # triples are unordered; keep the order deterministic
+    return NodeView(store, name, types, metadata, frozen,
+                    entity=next((_ENTITY_BY_TYPE[t] for t in types if t in _ENTITY_BY_TYPE), None))
 
 
 def node_exists(store, name):
@@ -154,7 +158,8 @@ def raw_triples_of(store, name):
         kind = edge_kind(quad.predicate)
         if kind is not None:
             rows.append((node_name(quad.subject), kind, name, 'node', graph_name(quad.graph_name)))
-    rows.sort(key=lambda r: (r[0] != name, r[1], r[2]))
+    # This node's own triples first, and among them rdf:type before everything else.
+    rows.sort(key=lambda r: (r[0] != name, r[1] != 'rdf:type', r[1], r[2]))
     return rows
 
 
@@ -185,9 +190,15 @@ def _sort_key(row):
 def _all_type_rows(store):
     global _type_rows_cache
     if _type_rows_cache is None:
+        # One row per node, carrying every one of its types (a node may have
+        # several): (name, sorted tuple of types, provider).
+        grouped = {}
+        for q in store.quads_for_pattern(None, RDF_TYPE, None, None):
+            key = (node_name(q.subject), graph_name(q.graph_name))
+            grouped.setdefault(key, set()).add(type_name(q.object))
         _type_rows_cache = sorted(
-            ((node_name(q.subject), type_name(q.object), graph_name(q.graph_name))
-             for q in store.quads_for_pattern(None, RDF_TYPE, None, None)),
+            ((name, tuple(sorted(types)), provider)
+             for (name, provider), types in grouped.items()),
             key=_sort_key)
     return _type_rows_cache
 
@@ -233,7 +244,7 @@ def _subtype_closure(store, qualified_type):
 
 def list_nodes(store, type_filter=None, query=None, name_prefix=None,
               providers=None, limit=None, offset=0, regex=False):
-    """``(rows, total)`` -- ``(name, type)`` pairs for materialized nodes,
+    """``(rows, total)`` -- ``(name, types)`` pairs (``types`` a tuple) for materialized nodes,
     optionally restricted to a type (and its subtypes), a name substring (or,
     with ``regex=True``, a name regex -- see below), a name prefix (a
     provider's own ``"prefix:"`` namespace), and/or a set of enabled
@@ -248,8 +259,10 @@ def list_nodes(store, type_filter=None, query=None, name_prefix=None,
         allowed_providers = set(providers)
         rows = [r for r in rows if r[2] in allowed_providers]
     if type_filter:
-        allowed = _subtype_closure(store, type_filter)
-        rows = [r for r in rows if r[1] in allowed]
+        # One type, or several (a node matches if it has any of them).
+        wanted = [type_filter] if isinstance(type_filter, str) else list(type_filter)
+        allowed = set().union(*(_subtype_closure(store, t) for t in wanted))
+        rows = [r for r in rows if allowed.intersection(r[1])]
     if name_prefix:
         rows = [r for r in rows if r[0].startswith(name_prefix)]
     if query:
@@ -277,7 +290,52 @@ def list_nodes(store, type_filter=None, query=None, name_prefix=None,
     total = len(rows)
     if limit is not None:
         rows = rows[offset:offset + limit]
-    return [(name, type_) for name, type_, _ in rows], total
+    return [(name, types) for name, types, _ in rows], total
+
+
+def type_hierarchy(store, declared=None):
+    """``(parents, children, all_types)`` over every type the store knows --
+    its ``subClassOf`` triples, every ``rdf:type`` object -- plus ``declared``
+    (``{type: parent or None}``, e.g. the in-process vocabulary, which also
+    knows root types and types of providers whose nodes aren't materialized).
+    A type with no parent is a root."""
+    parents = {}
+    for t, parent in (declared or {}).items():
+        parents[t] = parent
+    for t, parent in _type_parents(store).items():
+        parents[t] = parent
+    for _, types, _ in _all_type_rows(store):
+        for t in types:
+            parents.setdefault(t, None)
+    for parent in list(parents.values()):
+        if parent is not None:
+            parents.setdefault(parent, None)
+    children = {}
+    for t, parent in parents.items():
+        if parent is not None:
+            children.setdefault(parent, []).append(t)
+    for kids in children.values():
+        kids.sort()
+    return parents, children, set(parents)
+
+
+def counts_per_type(store, parents, providers=None):
+    """``{type: node count}`` for *every* type, each node counted under each
+    of its types and every ancestor of them (so ``irds:Table``'s count is all
+    tables), once per node."""
+    allowed = set(providers) if providers is not None else None
+    counts = {t: 0 for t in parents}
+    for _, types, p in _all_type_rows(store):
+        if allowed is not None and p not in allowed:
+            continue
+        seen = set()
+        for t in types:
+            while t is not None and t not in seen:
+                seen.add(t)
+                t = parents.get(t)
+        for t in seen:
+            counts[t] = counts.get(t, 0) + 1
+    return counts
 
 
 def counts_by_type(store, categories, providers=None):
@@ -287,10 +345,10 @@ def counts_by_type(store, categories, providers=None):
     counts = {c: 0 for c in categories}
     closures = {c: _subtype_closure(store, c) for c in categories}
     allowed_providers = set(providers) if providers is not None else None
-    for _, t, p in _all_type_rows(store):
+    for _, types, p in _all_type_rows(store):
         if allowed_providers is not None and p not in allowed_providers:
             continue
         for c in categories:
-            if t in closures[c]:
+            if closures[c].intersection(types):
                 counts[c] += 1
     return counts

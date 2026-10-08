@@ -2,14 +2,13 @@
 {% import "_macros.html" as m %}
 {% block title %}{{ node.qualified_name }} &mdash; ir-datasets.com{% endblock %}
 {% block content %}
-{{ m.node_header(node) }}
 
 {% set sections = [('overview', 'Overview')]
   + ([('related', 'Related Nodes')] if related.sources or related.derived_from or related.used_by else [])
   + ([('samples', 'Sample Rows')] if sample_table[1] else [])
   + [('use-it', 'Use It'), ('raw-triples', 'Raw Triples')]
   + ([('frozen', 'Frozen Manifest')] if frozen else []) %}
-{% call m.spy_layout(sections) %}
+{% call m.spy_layout(sections, node) %}
 <div class="card spy-target" id="overview">
   <div class="card-body">
 {{ m.desc_para(node) }}
@@ -37,17 +36,20 @@
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M11 6h9"/><path d="M11 12h9"/><path d="M12 18h8"/><path d="M4 16a2 2 0 1 1 4 0c0 .591 -.5 1 -1 1.5l-3 2.5h4"/><path d="M6 10v-6l-2 2"/></svg>
       </div>
       <div class="acq-main">
-        <div class="acq-title">Relevance Levels</div>
-        <div class="table-responsive">
-          <table class="table table-sm table-vcenter mb-0">
-            <thead><tr><th class="w-1">Score</th><th>Meaning</th>{% if frozen.score_counts %}<th class="text-end">Judgments</th>{% endif %}</tr></thead>
-            <tbody>
-            {% for score, meaning, n in score_rows %}
-            <tr><td><code>{{ score }}</code></td><td>{{ meaning if meaning else '' }}</td>{% if frozen.score_counts %}<td class="text-end">{{ '{:,}'.format(n) if n is not none else '—' }}</td>{% endif %}</tr>
-            {% endfor %}
-            </tbody>
-          </table>
-        </div>
+        <div class="acq-title">Relevance Labels</div>
+        <div class="acq-sub">The meaning of the integer labels assigned to query-document pair (the <code>relevance</code> value)</div>
+      </div>
+      {#- Outside .acq-main so the table spans the whole card, not just the column beside the icon. #}
+      <div class="table-responsive acq-levels-table">
+        <table class="table card-table table-sm table-vcenter mb-0">
+          <thead><tr><th class="w-1">Label</th><th>Meaning</th>{% if frozen.score_counts %}<th class="text-end">Count</th><th class="w-1"></th>{% endif %}</tr></thead>
+          {% set total_n = score_rows|map(attribute=2)|select('number')|sum %}
+          <tbody>
+          {% for score, meaning, n in score_rows %}
+          <tr><td><code>{{ score }}</code></td><td>{{ meaning if meaning else '' }}</td>{% if frozen.score_counts %}<td class="text-end">{{ '{:,}'.format(n) if n is not none else '—' }}</td><td class="text-end text-nowrap text-secondary w-1">{{ '{:.1f}%'.format(100 * n / total_n) if n is not none and total_n else '—' }}</td>{% endif %}</tr>
+          {% endfor %}
+          </tbody>
+        </table>
       </div>
     </div>
     {% endif %}
@@ -152,3 +154,5 @@
 {{ m.frozen_section(frozen) }}
 {% endcall %}
 {% endblock %}
+
+{% block scripts %}<script src="{{ url_for('static', filename='sample.js') }}"></script>{% endblock %}

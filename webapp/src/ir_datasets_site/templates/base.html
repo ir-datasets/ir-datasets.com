@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>{% block title %}ir-datasets.com{% endblock %}</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1/dist/css/tabler.min.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1/dist/libs/tom-select/dist/css/tom-select.bootstrap5.min.css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
 </head>
@@ -15,7 +16,8 @@
       <h1 class="navbar-brand pe-0 pe-md-3">
         <a href="{{ url_for('index') }}" class="text-white text-decoration-none">ir-datasets<span style="color: #999;">.com</span></a>
       </h1>
-      <div class="navbar-nav flex-row order-md-last flex-fill">
+      <div class="navbar-nav flex-row order-md-last flex-fill align-items-center">
+        <a href="{{ url_for('types') }}" class="nav-link text-white-50 me-3">Types</a>
         <div class="nav-item flex-fill">
           {% block navbar_search %}
           {% if not static_build|default(false) %}
@@ -67,6 +69,7 @@
   </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@tabler/core@1/dist/js/tabler.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tabler/core@1/dist/libs/tom-select/dist/js/tom-select.complete.min.js"></script>
 <script src="{{ url_for('static', filename='browse.js') }}"></script>
 <script src="{{ url_for('static', filename='nav.js') }}"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>

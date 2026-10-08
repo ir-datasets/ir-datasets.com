@@ -28,6 +28,36 @@
     //: to (see .search-input-wrap in base.html/provider.html).
     var regexToggle = root.querySelector('[data-regex-toggle]') || document.querySelector('[data-regex-toggle]');
     var typeSelect = document.querySelector('[data-browse-type]');
+    //: The Type filter is a Tom Select tags input (see search.html): one
+    //: colored badge (the type's own badge-cat-* class, so color + icon) per
+    //: selected type, and per option in the dropdown.
+    if (typeSelect && !typeSelect.tomselect && window.TomSelect) {
+      var typeOptions = JSON.parse(typeSelect.getAttribute('data-options') || '[]');
+      new TomSelect(typeSelect, {
+        options: typeOptions,
+        valueField: 'value',
+        labelField: 'label',
+        searchField: ['label', 'value'],
+        onItemAdd: function () { this.setTextboxValue(''); this.refreshOptions(false); },
+        plugins: ['remove_button'],
+        persist: false,
+        create: false,
+        maxOptions: null,
+        controlInput: '<input>',
+        copyClassesToDropdown: false,
+        dropdownParent: 'body',
+        render: {
+          item: function (data, escape) {
+            return '<div class="badge ' + escape(data.badge_class) + '">' + escape(data.label) + '</div>';  // root is the badge: remove_button appends inside it
+          },
+          //: the sidebar is narrow, so the description is a tooltip, not inline text
+          option: function (data, escape) {
+            return '<div title="' + escape(data.desc) + '"><span class="badge ' + escape(data.badge_class) + '">' +
+              escape(data.label) + '</span></div>';
+          }
+        }
+      });
+    }
     var providerBoxes = document.querySelectorAll('[data-browse-provider]');
     var namePrefix = root.getAttribute('data-name-prefix') || '';
     var limit = parseInt(root.getAttribute('data-limit') || '200', 10);
@@ -63,8 +93,14 @@
       frag.querySelector('[data-f-prefix]').textContent = i === -1 ? '' : row.name.slice(0, i + 1);
       frag.querySelector('[data-f-name]').textContent = i === -1 ? row.name : row.name.slice(i + 1);
       var typeEl = frag.querySelector('[data-f-type]');
-      typeEl.textContent = row.type_label;
-      typeEl.classList.add(row.badge_class);
+      // One badge per type (a node may have several).
+      var badges = row.badges || [{label: row.type_label, badge_class: row.badge_class}];
+      badges.forEach(function (b, k) {
+        var el = k === 0 ? typeEl : typeEl.cloneNode(false);
+        el.textContent = b.label;
+        el.classList.add(b.badge_class);
+        if (k > 0) typeEl.parentNode.appendChild(el);
+      });
       tbody.appendChild(frag);
     }
 
@@ -106,7 +142,10 @@
       var params = new URLSearchParams();
       if (searchInput && searchInput.value.trim()) params.set('q', searchInput.value.trim());
       if (regexToggle && regexToggle.getAttribute('aria-pressed') === 'true') params.set('regex', '1');
-      if (typeSelect && typeSelect.value) params.set('type', typeSelect.value);
+      if (typeSelect && typeSelect.value) {
+        //: a node matches if it has any of the selected types (or a subtype)
+        typeSelect.value.split(',').filter(Boolean).forEach(function (t) { params.append('type', t); });
+      }
       if (namePrefix) params.set('prefix', namePrefix);
       if (providerBoxes.length) params.set('providers', selectedProviders().join(','));
       return params;
