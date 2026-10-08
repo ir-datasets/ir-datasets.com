@@ -140,4 +140,5 @@ cython_debug/
 .DS_Store
 
 # Materialized graph store (built by webapp/build_graph_db.py; see webapp/README.md)
-webapp/graph.db/
+graph.db
+graph.nq.gz
