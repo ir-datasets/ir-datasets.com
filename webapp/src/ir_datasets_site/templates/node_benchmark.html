@@ -81,7 +81,7 @@
    backing edge; that provenance is instead visible on the derived facet's own
    page (follow a Tables link above), via a real edge. #}
 
-{{ m.use_it_section(snippet, snippet_config) }}
+{{ m.use_it_section(snippet, snippet_config, package=package, requires=requires) }}
 
 {{ m.triples_section(raw_triples, node.qualified_name) }}
 {% endcall %}

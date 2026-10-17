@@ -4,7 +4,7 @@
 {% block content %}
 
 {% set sections = [('overview', 'Overview'), ('raw-triples', 'Raw Triples')]
-  + ([('frozen', 'Frozen Manifest')] if frozen else []) %}
+  + ([('frozen', 'Declared Facts')] if frozen else []) %}
 {% call m.spy_layout(sections, node) %}
 <p class="text-secondary">This node's type (<code>{{ node.type }}</code>) isn't one this
 site has a dedicated template for yet &mdash; likely a third-party provider's

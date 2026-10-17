@@ -56,10 +56,36 @@
 {% endif %}
 {% endmacro %}
 
+{# Extra packages a node (or anything it is built from) needs beyond the core install. #}
+{% macro requires_row(requires, install_hint) %}
+{% if requires %}
+<div class="acq-row"><span class="acq-label">Extra packages</span><span>{% for r in requires %}<a href="https://pypi.org/project/{{ r }}/" class="badge badge-sm bg-yellow-lt">{{ r }}</a> {% endfor %}<span class="text-secondary">&mdash; not installed by default:</span> <code>{{ install_hint }}</code></span></div>
+{% endif %}
+{% endmacro %}
+
+{# Installation, as the first part of a Use It card: one copyable command for the
+   package this node comes from plus any extra packages it needs. Only when there
+   are extra packages is there anything to say, and then it's an alert. #}
+{% macro install_block(package, requires) %}
+{% if package or requires %}
+<div class="card-body border-bottom py-2" id="install">
+  <div class="text-secondary small mb-1">Install</div>
+  <pre class="bg-secondary-lt p-2 mb-0 overflow-auto"><code class="language-bash">pip install {{ ([package] if package else []) | join(' ') }}{% if requires %}{{ ' ' if package else '' }}{{ requires | join(' ') }}{% endif %}</code></pre>
+  {% if requires %}
+  <div class="alert alert-warning mt-2 mb-0 py-2" role="alert">
+    <strong>Extra dependencies needed:</strong>
+    {% for r in requires %}<a href="https://pypi.org/project/{{ r }}/" class="badge bg-yellow-lt text-reset"><code>{{ r }}</code></a> {% endfor %}
+    &mdash; not installed with the default install.
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+{% endmacro %}
+
 {% macro frozen_section(frozen) %}
 {% if frozen %}
 <div class="card mt-3 spy-target" id="frozen">
-  <div class="card-header"><h3 class="card-title">Frozen manifest row</h3></div>
+  <div class="card-header"><h3 class="card-title">Declared facts</h3></div>
   <div class="table-responsive">
   <table class="table table-vcenter card-table">
   <tbody>
@@ -75,9 +101,10 @@
 {% endif %}
 {% endmacro %}
 
-{% macro use_it_section(snippet, config=none) %}
+{% macro use_it_section(snippet, config=none, package=none, requires=none) %}
 <div class="card mt-3 spy-target" id="use-it">
   <div class="card-header"><h3 class="card-title">Use It</h3></div>
+  {{ install_block(package, requires) }}
   {% if config %}
   <div class="card-body border-bottom py-2 d-flex flex-wrap gap-3 align-items-center" data-use-it-config='{{ config|tojson|forceescape }}'>
     {% for facet in config.facets if facet.options|length > 1 %}

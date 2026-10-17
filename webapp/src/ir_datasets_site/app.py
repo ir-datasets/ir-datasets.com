@@ -30,6 +30,7 @@ from markupsafe import Markup, escape
 from flask import Flask, abort, jsonify, render_template, request, send_file, url_for
 
 from . import graph_queries as gq
+from ir_datasets.v2 import requirements as v2_requirements
 from ir_datasets.v2.vocabulary import protocol_of as vocabulary_protocol_of
 
 try:
@@ -221,16 +222,59 @@ def _type_badge_class(t):
     return f'badge-cat-{_type_color(t)}'
 
 
-def _frozen_count(table):
-    """A table's record count, from the frozen row ONLY.
+def _frozen_of(node):
+    """The facts a page shows beside a node's metadata: ``count`` (the author's
+    declared ``count_hint``) and a git repo's ``commit``. A store node carries
+    them as ``NodeView._frozen()``; a live node (the ``hf:`` fallback) is read
+    directly, never materialized."""
+    frozen_fn = getattr(node, '_frozen', None)
+    if frozen_fn is not None:
+        return frozen_fn()
+    out = {}
+    count_hint = getattr(node, 'count_hint', None)
+    if count_hint is not None:
+        out['count'] = count_hint
+    commit = (getattr(node, 'metadata', None) or {}).get('commit')
+    if commit:
+        out['commit'] = commit
+    return out
 
-    Deliberately never falls back to ``Table.count()`` -- for an unverified
-    node (no ``freeze --verify`` run yet) that can fall through to actually
-    building a docstore, which for something like BEIR's msmarco means
-    downloading a 1GB+ zip on page render. A page must never trigger that as
-    a side effect of being viewed.
+
+def _frozen_count(table):
+    """A table's record count, from the declared count ONLY.
+
+    Deliberately never falls back to ``Table.count()`` -- that can fall
+    through to actually building a docstore, which for something like BEIR's
+    msmarco means downloading a 1GB+ zip on page render. A page must never
+    trigger that as a side effect of being viewed.
     """
-    return table._frozen().get('count')
+    return _frozen_of(table).get('count')
+
+
+def _provider_vocab(p):
+    """What provider.html shows about a provider's declared vocabulary, read
+    from the live provider (there is no manifest any more)."""
+    return {'types': dict(p.types), 'edge_kinds': dict(p.edge_kinds),
+            'defaultable': sorted(p.defaultable_fields), 'aliases': {}}
+
+
+def _package_of(node):
+    """The pip distribution a node comes from, as recorded in the graph (or
+    computed for a live-fallback node)."""
+    meta = node.metadata
+    if meta.get('package'):
+        return meta['package']
+    from ir_datasets.v2.vocabulary import row_for
+    return row_for(node).get('package')
+
+
+def _requires_for(node, qualified):
+    """Every optional pip extra a node needs, its own and those of everything
+    it is built from: from the store for a materialized node, from the live
+    graph for the fallback."""
+    if gq.node_exists(store, qualified):
+        return gq.effective_requires(store, qualified)
+    return v2.graph.requires(node)
 
 
 #: Longest cell text shown in the sample-records table; the rest is elided
@@ -370,7 +414,7 @@ def _resource_snippet(node):
     manual = [x for x in sources if x.get('kind') == 'manual']
     head = f"import ir_datasets.v2\nres = ir_datasets.v2.load({name!r})\n"
     if meta.get('repo'):
-        commit = node._frozen().get('commit')
+        commit = _frozen_of(node).get('commit')
         return (head +
                 f"root = res.path()  # clones/fetches the repo"
                 f"{f' at commit {commit[:10]}' if commit else ''}, returns the local directory\n"
@@ -730,9 +774,8 @@ def provider(prefix):
     if p is None:
         abort(404, f'no provider registered under prefix {prefix!r} (installed: '
                     f'{", ".join(sorted(v2.graph.providers)) or "none"})')
-    manifest = p.manifest()
     return render_template(
-        'provider.html', provider=p, prefix=prefix, manifest=manifest,
+        'provider.html', provider=p, prefix=prefix, manifest=_provider_vocab(p),
         type_labels=TYPE_LABELS,
         # See search()'s matching comment -- only static_site.py's build()
         # passes real rows.
@@ -832,7 +875,9 @@ def node(qualified):
     category = _category_of(n.type)
     template = (TEMPLATE_BY_EXACT_TYPE.get(n.type)
                 or TEMPLATE_BY_TYPE.get(category, 'node_generic.html'))
-    frozen = n._frozen()
+    frozen = _frozen_of(n)
+    requires = _requires_for(n, qualified)
+    package = _package_of(n)
     derived = []
     for subject, kind, obj, other in triples:
         if kind == 'irds:derived_from' and obj == qualified:
@@ -840,6 +885,8 @@ def node(qualified):
             derived.append({'name': subject, 'type': o.type if o else None})
     return render_template(
         template, node=n, frozen=frozen, triples=triples, raw_triples=raw_triples,
+        requires=requires, install_hint=v2_requirements.install_hint(requires) if requires else None,
+        package=package,
         derived=derived,
         type_labels=TYPE_LABELS, sample_table=_pretty_samples(frozen, _record_fields(n) or ()),
         snippet=_python_snippet(n), snippet_config=_snippet_config(n), record_fields=_record_fields(n), related=_related(n, triples),

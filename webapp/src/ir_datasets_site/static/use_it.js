@@ -6,7 +6,7 @@
   var holder = document.querySelector('[data-use-it-config]');
   if (!holder) return;
   var config = JSON.parse(holder.getAttribute('data-use-it-config'));
-  var code = document.querySelector('#use-it pre code');
+  var code = document.querySelector('#use-it pre code.language-python');
   var selects = holder.querySelectorAll('select[data-use-it-facet]');
 
   function build() {

@@ -7,7 +7,7 @@
   + ([('related', 'Related Nodes')] if related.sources or related.derived_from or related.used_by else [])
   + ([('samples', 'Sample Rows')] if sample_table[1] else [])
   + [('use-it', 'Use It'), ('raw-triples', 'Raw Triples')]
-  + ([('frozen', 'Frozen Manifest')] if frozen else []) %}
+  + ([('frozen', 'Declared Facts')] if frozen else []) %}
 {% call m.spy_layout(sections, node) %}
 <div class="card spy-target" id="overview">
   <div class="card-body">
@@ -148,7 +148,7 @@
 </div>
 {% endif %}
 
-{{ m.use_it_section(snippet) }}
+{{ m.use_it_section(snippet, package=package, requires=requires) }}
 
 {{ m.triples_section(raw_triples, node.qualified_name) }}
 {{ m.frozen_section(frozen) }}

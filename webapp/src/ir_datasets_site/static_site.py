@@ -25,13 +25,13 @@ calls it, and app.py's templates directly, for every page this site has).
 import shutil
 from pathlib import Path
 
-from flask import render_template
+from flask import render_template, url_for
 from tqdm import tqdm
 
 from . import graph_queries as gq
 from .app import (
     DEFAULT_HIDDEN_PROVIDERS, DUMP_PATH, TYPE_LABELS, TYPE_LABELS_PLURAL,
-    _node_url, _row_dict, _selected_providers, _type_graph, app, store, v2,
+    _node_url, _provider_vocab, _row_dict, _selected_providers, _type_graph, app, store, v2,
 )
 
 #: Providers excluded from a static build unless explicitly asked for (via
@@ -174,7 +174,7 @@ def build(out='dist', providers=None):
             p = v2.graph.providers[prefix]
             rows = _rows_for(name_prefix=f'{prefix}:', providers=_selected_providers(scope={prefix}))
             html = render_template(
-                'provider.html', provider=p, prefix=prefix, manifest=p.manifest(),
+                'provider.html', provider=p, prefix=prefix, manifest=_provider_vocab(p),
                 type_labels=TYPE_LABELS, rows=rows, static_build=True)
             _write_page(out_dir, f'/provider/{prefix}', html)
 

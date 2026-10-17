@@ -2,9 +2,9 @@
 webapp can browse it via fast, indexed lookups instead of walking live
 Python objects on every request (see ``graph_queries.py``).
 
-Delete-and-recreate, not incremental: ``manifest.json`` is small (hundreds of
-nodes) and is the single source of truth, so a full rebuild is simplest and
-needs no diff/deletion logic. Includes a live, best-effort snapshot of the
+Delete-and-recreate, not incremental: the catalog is small (thousands of
+nodes) and is rebuilt from the imported ``ir_datasets.v2`` modules, so a full
+rebuild is simplest and needs no diff/deletion logic. Includes a live, best-effort snapshot of the
 fully dynamic ``hf`` provider (see ``hf_provider.export_triples``) -- run
 this again whenever you want a fresher one.
 

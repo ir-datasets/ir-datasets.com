@@ -18,7 +18,7 @@ happens once, ahead of time, instead of on every request:
 Hub datasets, fully dynamic -- see `ir_datasets.v2.hf_provider`) are both
 materialized; `hf`'s data is necessarily a point-in-time snapshot (the store
 stamps each of its nodes with `snapshot_at`), since it can't be enumerated
-ahead of time the way a frozen manifest can. A node the last snapshot missed
+ahead of time. A node the last snapshot missed
 (a brand-new hf repo) still resolves -- `/n/<qualified>` falls back to a live
 `ir_datasets.v2` lookup for anything not in the store.
 
@@ -45,13 +45,12 @@ ir-datasets-site build-graph-db
 ir-datasets-site serve
 ```
 
-Re-run `build-graph-db` whenever `ir_datasets/v2/manifest.json` changes or
+Re-run `build-graph-db` whenever the `ir_datasets.v2` catalog changes or
 you want a fresher `hf:` snapshot -- it's a full delete-and-recreate, not
 incremental, and takes well under a second for `irds` alone (the `hf` crawl's
 time depends on how many repos are tagged `ir-datasets` on the Hub; pass
-`--providers irds` to skip it). The manifest itself needs to exist first
-(`cd ~/ws/ir-datasets && python -m ir_datasets.v2.freeze --verify`) — counts,
-hashes and sample records only render if a manifest has been frozen.
+`--providers irds` to skip it). There is no manifest to freeze first: the
+graph is built from the imported `ir_datasets.v2` modules.
 
 `graph.db` is written to `./graph.db` (the current working directory), not
 inside the installed package -- override with `--out`/`--store` or the
@@ -101,6 +100,21 @@ This drops the two things that genuinely need a live backend:
 Everything else (home page, every node page, every provider page) renders
 identically to the live app.
 
+## Source package and extra packages
+
+Every node records the pip **package** it comes from (`package`, the
+distribution that provides the defining module, else the provider's declared
+one) and may declare extra **packages** it needs beyond the core install
+(`requires-dependency` in the graph, by distribution name -- `trec-car-tools`,
+not an extra). Node pages show both in the **Use It** card's *Install* block: one
+copyable `pip install <package> <extra packages>` line; only when there are
+extra packages is there a warning-styled *Extra dependencies needed* alert
+naming them (linked to PyPI). The extra packages include those of everything the node
+is built from (so a benchmark lists what its tables need):
+`graph_queries.effective_requires` computes that from the store by walking
+structural edges, and the live-fallback path uses `Graph.requires`. A suite has
+no Use It card, so its overview shows an *Extra packages* row instead.
+
 ## What's here
 
 | Route | Renders |
@@ -119,9 +133,9 @@ identically to the live app.
   family is hand-ported. This is a *content* gap (the v1→v2 manifest exporter,
   plan phase 3), not an architecture one — the app will show whatever's in the
   graph without changes once that exists.
-- **Counts only show where `freeze --verify` has run.** BEIR/NanoBEIR are
-  frozen metadata-only (no `--verify`, since that would download BEIR's
-  multi-GB zips) — their pages show `—` for counts rather than a number.
+- **Counts only show where the author declared a `count_hint`.** The frozen
+  manifest (counts, content hashes, sample records) no longer exists, so
+  pages show `—` for counts of tables without one, and no sample rows.
   Page rendering **never** triggers materialization itself, deliberately (see
   `app.py`'s `_frozen_count` and the comment on `{% if table is not none %}`
   in `node_benchmark.html` — a bare `{% if table %}` on a `Table` object

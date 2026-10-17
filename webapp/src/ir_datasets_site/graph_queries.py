@@ -13,13 +13,13 @@ import re
 
 from .rdf_schema import (
     FROZEN_FIELDS, RDF_TYPE, RDFS_SUBCLASS_OF, edge_iri, edge_kind, graph_name,
-    meta_field, node_iri, node_name, type_iri, type_name,
+    meta_field, meta_iri, node_iri, node_name, type_iri, type_name,
 )
 
 #: Fields that were emitted once per list element (see registry.row_triples)
 #: -- collect repeated (name, field) triples back into a list instead of
 #: letting the last one silently win.
-_LIST_FIELDS = {'sources', 'metrics', 'citation', 'license'}
+_LIST_FIELDS = {'sources', 'metrics', 'citation', 'license', 'requires-dependency'}
 #: Fields whose single literal is a JSON blob of a dict, decoded back to one
 #: (`samples_json` -> `samples`, `defs_json` -> `defs`).
 _JSON_SUFFIX = '_json'
@@ -105,6 +105,31 @@ def node_data(store, name):
     types.sort()  # triples are unordered; keep the order deterministic
     return NodeView(store, name, types, metadata, frozen,
                     entity=next((_ENTITY_BY_TYPE[t] for t in types if t in _ENTITY_BY_TYPE), None))
+
+
+def effective_requires(store, name):
+    """Every optional pip extra ``name`` needs: its own (``requires-dependency`` literals)
+    plus those of everything it is built from, found by walking structural
+    edges (``derived_from``, a benchmark's facets, suite membership, ...) --
+    the same answer ``Graph.requires`` gives from the live graph, as a tuple in
+    first-seen order. ``()`` for a node that needs nothing, or isn't in the store."""
+    from ir_datasets.v2.vocabulary import structural_kinds
+    structural = structural_kinds()
+    out, seen, stack = [], {name}, [name]
+    requires_iri = meta_iri('requires-dependency')
+    while stack:
+        current = stack.pop()
+        iri = node_iri(current)
+        for quad in store.quads_for_pattern(iri, requires_iri, None):
+            if quad.object.value not in out:
+                out.append(quad.object.value)
+        for quad in store.quads_for_pattern(iri, None, None):
+            if edge_kind(quad.predicate) in structural:
+                target = node_name(quad.object)
+                if target is not None and target not in seen:
+                    seen.add(target)
+                    stack.append(target)
+    return tuple(out)
 
 
 def node_exists(store, name):
