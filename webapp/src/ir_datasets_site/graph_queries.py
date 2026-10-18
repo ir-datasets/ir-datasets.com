@@ -24,13 +24,19 @@ _LIST_FIELDS = {'citation', 'license', 'metric', 'source', 'fileHash', 'requires
 
 
 def _value_sort_key(value):
-    """A stable order for a property's values: JSON documents by their ``order`` (a
-    source, a column) or ``label`` (a relevance label), everything else by text."""
+    """A stable order for a property's values. A JSON document goes by its ``order``
+    (a source, a column), else its ``label`` (a relevance label), else its contents;
+    anything else sorts by its text."""
     if isinstance(value, dict):
-        position = value.get('order', value.get('label', 0))
-        number = position if isinstance(position, (int, float)) else float('inf')
-        return (0, number, json.dumps(value, sort_keys=True))
-    return (1, 0, str(value))
+        text = json.dumps(value, sort_keys=True)
+        for tier, field in enumerate(('order', 'label')):
+            if field in value:
+                position = value[field]
+                # numbers before text, so a mixed set never compares across types
+                rank = (0, position, '') if isinstance(position, (int, float)) else (1, 0, str(position))
+                return (tier, rank, text)
+        return (2, (0, 0, ''), text)
+    return (3, (0, 0, ''), str(value))
 
 
 def _local(field):
@@ -252,8 +258,22 @@ def raw_triples_of(store, name):
         if kind is not None:
             rows.append((node_name(quad.subject), kind, name, 'node', graph_name(quad.graph_name)))
     # This node's own triples first, and among them rdf:type before everything else.
-    rows.sort(key=lambda r: (r[0] != name, r[1] != 'rdf:type', r[1], r[2]))
+    # A property's JSON documents come in their own ``order`` (sources, columns) or
+    # ``label`` (relevance labels), not alphabetically by their text.
+    rows.sort(key=lambda r: (r[0] != name, r[1] != 'rdf:type', r[1], _object_sort_key(r)))
     return rows
+
+
+def _object_sort_key(row):
+    """Order among one predicate's objects: JSON documents by ``_value_sort_key``,
+    anything else by its text."""
+    _, _, obj, kind, _ = row
+    if kind == 'literal' and isinstance(obj, str) and obj.startswith('{'):
+        try:
+            return _value_sort_key(json.loads(obj))
+        except ValueError:
+            pass
+    return _value_sort_key(str(obj))
 
 
 #: (name, type, provider) for every materialized node, sorted by name *with

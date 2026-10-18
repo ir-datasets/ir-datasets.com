@@ -16,9 +16,8 @@ happens once, ahead of time, instead of on every request:
 
 `irds` (this repo's own, trusted, first-party provider) and `hf` (HuggingFace
 Hub datasets, fully dynamic -- see `ir_datasets.v2.hf_provider`) are both
-materialized; `hf`'s data is necessarily a point-in-time snapshot (the store
-stamps each of its nodes with `snapshot_at`), since it can't be enumerated
-ahead of time. A node the last snapshot missed
+materialized; `hf`'s data is necessarily a point-in-time snapshot, since it can't be
+enumerated ahead of time. A node the last snapshot missed
 (a brand-new hf repo) still resolves -- `/n/<qualified>` falls back to a live
 `ir_datasets.v2` lookup for anything not in the store.
 

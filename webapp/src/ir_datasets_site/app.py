@@ -380,12 +380,6 @@ def _snippet_variants(node, triples=()):
         tables = [(node.type.rpartition(':')[2].lower(), 'table', _record_fields(node))]
     else:
         return variants
-    # Pandas: a table's records are named tuples, so a DataFrame takes them directly
-    frames = [f"{e}_df = pd.DataFrame({expr})" + (f"  # columns: {', '.join(fields)}" if fields else '')
-              for e, expr, fields in tables]
-    if frames:
-        variants.append({'id': 'pandas', 'label': 'Pandas', 'lang': 'python',
-                         'code': 'import pandas as pd\n' + head + '\n'.join(frames)})
     # Lookup by id (docs use the docstore; queries and answers are held in memory):
     # part of the Python API example.
     body = []
@@ -398,18 +392,92 @@ def _snippet_variants(node, triples=()):
             body.append(f"{entity}_by_id = {expr}.lookup(['ID1', 'ID2'])  # a dict of records")
     if body:
         variants[0]['code'] += '\n\n# look records up by id\n' + '\n'.join(body)
+    # Pandas: a table's records are named tuples, so a DataFrame takes them directly;
+    # part of the Python API example (the table or ``ds`` is already loaded above).
+    frames = [f"{e}_df = pd.DataFrame({expr})" + (f"  # columns: {', '.join(fields)}" if fields else '')
+              for e, expr, fields in tables]
+    if frames:
+        variants[0]['code'] += '\n\n# as a pandas DataFrame\nimport pandas as pd\n' + '\n'.join(frames)
     # Evaluation: qrels as ir_measures input
     if any(e == 'qrels' for e, _, _ in tables):
-        qrels = 'ds.qrels' if v2.is_subclass(node.type, v2.BENCHMARK) else 'table'
+        # a qrels table page loads the table as ``qrels``, not the generic ``table``
+        qrels, evaluate_head = ('ds.qrels', head) if v2.is_subclass(node.type, v2.BENCHMARK) \
+            else ('qrels', head.replace('table = ', 'qrels = ', 1))
         variants.append({'id': 'evaluate', 'label': 'Evaluate', 'lang': 'python', 'code':
             "import ir_datasets.v2\nimport ir_measures\nfrom ir_measures import nDCG, P\n"
-            + head.split('\n', 1)[1] +
-            "run = ...  # your system's output: a DataFrame or an iterable of scored-doc records\n"
+            + evaluate_head.split('\n', 1)[1] +
+            "run = ...  # your system's output: e.g., a DataFrame with query_id, doc_id, score\n"
             f"print(ir_measures.calc_aggregate([nDCG@10, P(rel=1)@10], {qrels}, run))"})
+    # PyTerrier: indexing a docs table (the records are read straight from the v2 loader)
+    pyterrier = _pyterrier_examples(node)
+    if pyterrier:
+        variants.append({'id': 'pyterrier', 'label': 'PyTerrier', 'lang': 'python', 'examples': pyterrier})
     xpm = _xpmir_snippet(node, tables, triples)
     if xpm:
         variants.append({'id': 'xpmir', 'label': 'XPM-IR', 'lang': 'python', 'code': xpm})
     return variants
+
+
+#: Docs columns that are text by type but not something to search.
+_NON_TEXT_COLUMNS = {'doc_id', 'marked_up_text', 'source_xml', 'msmarco_document_id'}
+
+
+#: ISO 639-1 language -> the Snowball stemmer ``pt.terrier.TerrierStemmer`` has for it.
+_TERRIER_STEMMERS = {'da': 'danish', 'fi': 'finnish', 'de': 'german', 'hu': 'hungarian',
+                     'no': 'norwegian', 'nb': 'norwegian', 'nn': 'norwegian',
+                     'pt': 'portugese', 'es': 'spanish', 'sv': 'swedish', 'tr': 'turkish'}
+
+
+def _pyterrier_examples(node):
+    """Ways to index a Docs table with PyTerrier -- ``[{'id', 'label', 'code'}]``, each
+    reading the records straight from the v2 loader (one dict per record, its text
+    columns as the indexed fields). ``None`` unless ``node`` is a Docs table."""
+    if not v2.is_subclass(node.type, v2.TABLE) or node.type.rpartition(':')[2].lower() != 'docs':
+        return None
+    columns = node.metadata.get('column') or []
+    fields = [c['name'] for c in columns
+              if c.get('data_type') == 'str' and c['name'] not in _NON_TEXT_COLUMNS] or ['text']
+    entries = ', '.join(["'docno': doc.doc_id"] + [f"{f!r}: doc.{f}" for f in fields])
+    records = f"{{{entries}}} for doc in docs"
+    lang = node.metadata.get('lang') or ''
+    foreign = bool(lang) and lang != 'en'
+    name = node.qualified_name.split(':', 1)[-1].replace('/', '_')
+    load = ["import pyterrier as pt", "import ir_datasets.v2",
+            f"docs = ir_datasets.v2.load({node.qualified_name!r})"]
+    stemmer = _TERRIER_STEMMERS.get(lang.split('-')[0].lower()) if foreign else None
+
+    # -- Terrier
+    terrier = load + [f"index = pt.terrier.TerrierIndex('{name}.terrier')"]
+    if foreign:
+        # TerrierIndex.index() uses the English analysis; indexer() takes it as arguments
+        if stemmer:
+            terrier.append(f"# the text is {lang}: use the UTF tokeniser with Terrier's {stemmer.capitalize()} "
+                           "stemmer (its stopword list is English, so none)")
+        else:
+            terrier.append(f"# the text is {lang}, which Terrier has no stemmer for: use the UTF "
+                           "tokeniser, no stemming, no stopwords")
+        terrier += ["indexer = index.indexer(",
+                    f"    text_attrs={fields!r},",
+                    "    tokeniser=pt.terrier.TerrierTokeniser.utf,",
+                    f"    stemmer=pt.terrier.TerrierStemmer.{stemmer or 'none'},",
+                    "    stopwords=pt.terrier.TerrierStopwords.none)",
+                    f"indexer.index({records})"]
+    else:
+        terrier.append(f"index.index({records})")
+    terrier.append("# afterwards, index.bm25() is a BM25 retriever over it")
+
+    # -- PISA
+    pisa = ["from pyterrier_pisa import PisaIndex", "import ir_datasets.v2",
+            f"docs = ir_datasets.v2.load({node.qualified_name!r})"]
+    options = []   # every str field is indexed by default
+    if foreign:
+        pisa.append(f"# the text is {lang}: PISA's stemmers and stopword list are English, so use neither. You may want to do additional pre-processing.")
+        options += ["stemmer='none'", "stops='none'"]
+    pisa += [f"index = PisaIndex({', '.join([repr(name + '.pisa')] + options)})",
+             f"index.index({records})",
+             "# afterwards, index.bm25() is a BM25 retriever over it"]
+    return [{'id': 'terrier', 'label': 'Build a Terrier index', 'code': '\n'.join(terrier)},
+            {'id': 'pisa', 'label': 'Build a PISA index', 'code': '\n'.join(pisa)}]
 
 
 def _v1_id(name, triples):

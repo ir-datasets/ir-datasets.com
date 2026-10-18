@@ -119,15 +119,28 @@
     {% endfor %}
   </div>
   {% endif %}
-  {#- One entry per way of using the node. Only the Python API exists for v2 so far
-      (the CLI / PyTerrier / XPM-IR integrations don't resolve v2 names yet); add
-      an entry (id, label, language, code) and its pill appears. -#}
+  {#- One entry per way of using the node: (id, label, lang, code). A variant that has
+      several examples gives ``examples`` instead -- (id, label, code) each -- and a
+      <select> in its pane switches between them. -#}
   {% set variants = variants or [{'id': 'python', 'label': 'Python API', 'lang': 'python', 'code': snippet}] %}
   <div class="px-3 pt-3 pb-3 variant-pills" role="group" aria-label="Usage example" data-variant-pills>
     {% for v in variants %}<button type="button" class="variant-pill{% if loop.first %} active{% endif %}" data-variant="{{ v.id }}" aria-pressed="{{ 'true' if loop.first else 'false' }}">{{ v.label }}</button>{% endfor %}
   </div>
   {% for v in variants %}
-  <pre class="bg-secondary-lt p-3 overflow-auto mb-0" style="border-radius: 0" data-variant-pane="{{ v.id }}"{% if not loop.first %} hidden{% endif %}><code class="language-{{ v.lang }}">{{ v.code }}</code></pre>
+  {% set examples = v.examples or [{'id': 'main', 'label': none, 'code': v.code}] %}
+  <div data-variant-pane="{{ v.id }}"{% if not loop.first %} hidden{% endif %}>
+    {% if examples|length > 1 %}
+    <div class="px-3 pb-3 d-flex align-items-center gap-2">
+      <label class="small text-secondary mb-0" for="example-{{ v.id }}">Example</label>
+      <select class="form-select form-select-sm w-auto" id="example-{{ v.id }}" data-example-select>
+        {% for ex in examples %}<option value="{{ ex.id }}">{{ ex.label }}</option>{% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    {% for ex in examples %}
+    <pre class="bg-secondary-lt p-3 overflow-auto mb-0" style="border-radius: 0" data-example="{{ ex.id }}"{% if not loop.first %} hidden{% endif %}><code class="language-{{ v.lang }}">{{ ex.code }}</code></pre>
+    {% endfor %}
+  </div>
   {% endfor %}
 </div>
 {% endmacro %}
