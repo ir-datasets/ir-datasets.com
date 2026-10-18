@@ -12,17 +12,31 @@ import json
 import re
 
 from .rdf_schema import (
-    FROZEN_FIELDS, RDF_TYPE, RDFS_SUBCLASS_OF, edge_iri, edge_kind, graph_name,
-    meta_field, meta_iri, node_iri, node_name, type_iri, type_name,
+    FROZEN_FIELDS, RDF_JSON, RDF_TYPE, RDFS_SUBCLASS_OF, edge_iri, edge_kind, graph_name,
+    graph_iri, meta_field, meta_iri, node_iri, node_name, type_iri, type_name,
 )
 
-#: Fields that were emitted once per list element (see registry.row_triples)
-#: -- collect repeated (name, field) triples back into a list instead of
-#: letting the last one silently win.
-_LIST_FIELDS = {'sources', 'metrics', 'citation', 'license', 'requires-dependency'}
-#: Fields whose single literal is a JSON blob of a dict, decoded back to one
-#: (`samples_json` -> `samples`, `defs_json` -> `defs`).
-_JSON_SUFFIX = '_json'
+#: Properties a page shows as a list. Any property can have several values in the
+#: graph (RDF has no single-valued properties); every other one a page shows as its
+#: first value in a stable order, and ``NodeView.values`` keeps all of them.
+_LIST_FIELDS = {'citation', 'license', 'metric', 'source', 'fileHash', 'requiresDependency',
+                'column', 'relevanceLabel'}
+
+
+def _value_sort_key(value):
+    """A stable order for a property's values: JSON documents by their ``order`` (a
+    source, a column) or ``label`` (a relevance label), everything else by text."""
+    if isinstance(value, dict):
+        position = value.get('order', value.get('label', 0))
+        number = position if isinstance(position, (int, float)) else float('inf')
+        return (0, number, json.dumps(value, sort_keys=True))
+    return (1, 0, str(value))
+
+
+def _local(field):
+    """``'irds:description'`` -> ``'description'``: a node's metadata is keyed by
+    local name, as the templates read it."""
+    return field.split(':', 1)[1] if ':' in field else field
 
 
 class NodeView:
@@ -31,13 +45,16 @@ class NodeView:
     ``type``, ``metadata``, ``entity``, ``_frozen()``) without
     ever importing/resolving the real node."""
 
-    def __init__(self, store, name, types, metadata, frozen, entity=None):
+    def __init__(self, store, name, types, metadata, frozen, entity=None, values=None):
         self.qualified_name = name
         # A node may have several types (e.g. a benchmark that is both an
         # AdhocBenchmark and a QaBenchmark); `type` is the first.
         self.types = list(types)
         self.type = self.types[0] if self.types else None
         self.metadata = metadata
+        #: Every value of every property (lists, sorted); ``metadata`` is the page
+        #: view of them (a list for ``_LIST_FIELDS``, else the first value).
+        self.values = values if values is not None else {}
         self.entity = entity
         self._frozen_row = frozen
         self._store = store
@@ -69,8 +86,7 @@ def node_data(store, name):
     """A ``NodeView`` built from every literal/type triple this node has, or
     ``None`` if it isn't in the store."""
     types = []
-    metadata = {}
-    frozen = {}
+    values = {}
     found = False
     for quad in store.quads_for_pattern(node_iri(name), None, None):
         found = True
@@ -81,34 +97,36 @@ def node_data(store, name):
         if field is None:
             continue  # an edge triple -- not this node's own literal data
         value = quad.object.value
-        if field.endswith(_JSON_SUFFIX):
-            field, value = field[:-len(_JSON_SUFFIX)], json.loads(value)
-        elif field in ('count', 'size'):
+        field = _local(field)
+        if getattr(quad.object, 'datatype', None) == RDF_JSON:
+            value = json.loads(value)
+        elif field in ('count', 'fileSize'):
             value = int(value)
-        bucket = frozen if field in FROZEN_FIELDS else metadata
-        if field in _LIST_FIELDS:
-            bucket.setdefault(field, []).append(value)
-        else:
-            bucket[field] = value
-    if 'citation' in metadata:
-        # A single literal may hold several ';'-separated citations
-        # (e.g. 'dblp:conf/clef/X; dblp:conf/eacl/Y'): split them apart.
-        metadata['citation'] = [c.strip() for raw in metadata['citation']
-                                for c in str(raw).split(';') if c.strip()]
-    if 'sources' in metadata:
-        # One JSON literal per source (see ir_datasets.v2.sources.describe_sources);
-        # triples are unordered, so each carries its own `order`.
-        metadata['sources'] = sorted((json.loads(x) for x in metadata['sources']),
-                                     key=lambda s: s['order'])
+        values.setdefault(field, []).append(value)
     if not found:
         return None
+    if 'citation' in values:
+        # A single literal may hold several ';'-separated citations
+        # (e.g. 'dblp:conf/clef/X; dblp:conf/eacl/Y'): split them apart.
+        # A BibTeX record ('@...') is kept whole.
+        values['citation'] = [c.strip() for raw in values['citation']
+                              for c in ([str(raw)] if str(raw).lstrip().startswith('@')
+                                        else str(raw).split(';')) if c.strip()]
+    # Triples are unordered: give every property's values a stable order (sources and
+    # columns carry their own `order`).
+    values = {field: sorted(vs, key=_value_sort_key) for field, vs in values.items()}
+    metadata, frozen = {}, {}
+    for field, vs in values.items():
+        bucket = frozen if field in FROZEN_FIELDS else metadata
+        bucket[field] = vs if field in _LIST_FIELDS else vs[0]
     types.sort()  # triples are unordered; keep the order deterministic
     return NodeView(store, name, types, metadata, frozen,
-                    entity=next((_ENTITY_BY_TYPE[t] for t in types if t in _ENTITY_BY_TYPE), None))
+                    entity=next((_ENTITY_BY_TYPE[t] for t in types if t in _ENTITY_BY_TYPE), None),
+                    values=values)
 
 
 def effective_requires(store, name):
-    """Every optional pip extra ``name`` needs: its own (``requires-dependency`` literals)
+    """Every optional pip extra ``name`` needs: its own (``irds:requiresDependency`` literals)
     plus those of everything it is built from, found by walking structural
     edges (``derived_from``, a benchmark's facets, suite membership, ...) --
     the same answer ``Graph.requires`` gives from the live graph, as a tuple in
@@ -116,7 +134,7 @@ def effective_requires(store, name):
     from ir_datasets.v2.vocabulary import structural_kinds
     structural = structural_kinds()
     out, seen, stack = [], {name}, [name]
-    requires_iri = meta_iri('requires-dependency')
+    requires_iri = meta_iri('irds:requiresDependency')
     while stack:
         current = stack.pop()
         iri = node_iri(current)
@@ -130,6 +148,56 @@ def effective_requires(store, name):
                     seen.add(target)
                     stack.append(target)
     return tuple(out)
+
+
+def property_term(qualified, range):
+    """The store's IRI for a declared graph property: the standard RDF ones as
+    themselves, an edge under the edge namespace, a property under the meta one."""
+    if qualified == 'rdf:type':
+        return RDF_TYPE
+    if qualified == 'rdfs:subClassOf':
+        return RDFS_SUBCLASS_OF
+    return edge_iri(qualified) if range == 'node' else meta_iri(qualified)
+
+
+def property_counts(store, declared, providers=None):
+    """``{qualified graph property: triple count}`` for each declared graph property
+    (``{qualified: {'range': ...}}``), over the named graphs of ``providers``
+    (every provider's if ``None``)."""
+    graphs = None if providers is None else [graph_iri(p) for p in providers]
+    counts = {}
+    for qualified, entry in declared.items():
+        term = property_term(qualified, entry['range'])
+        if graphs is None:
+            counts[qualified] = sum(1 for _ in store.quads_for_pattern(None, term, None))
+        else:
+            counts[qualified] = sum(1 for g in graphs
+                                    for _ in store.quads_for_pattern(None, term, None, g))
+    return counts
+
+
+def property_examples(store, qualified, range, providers=None, limit=50):
+    """Up to ``limit`` ``(subject, object, object_kind)`` rows using a graph property
+    -- ``object_kind`` is ``'node'``, ``'type'`` or ``'literal'`` -- in store order
+    (a sample, not a sorted listing), over the named graphs of ``providers``."""
+    term = property_term(qualified, range)
+    graphs = [None] if providers is None else [graph_iri(p) for p in providers]
+    rows = []
+    for g in graphs:
+        args = (None, term, None) if g is None else (None, term, None, g)
+        for quad in store.quads_for_pattern(*args):
+            subject = node_name(quad.subject)
+            if subject is None:                      # a type's own subClassOf row
+                subject = type_name(quad.subject)
+            if quad.predicate == RDF_TYPE or quad.predicate == RDFS_SUBCLASS_OF:
+                rows.append((subject, type_name(quad.object), 'type'))
+            elif range == 'node':
+                rows.append((subject, node_name(quad.object), 'node'))
+            else:
+                rows.append((subject, quad.object.value, 'literal'))
+            if len(rows) >= limit:
+                return rows
+    return rows
 
 
 def node_exists(store, name):
@@ -251,7 +319,7 @@ def _type_parents(store):
 
 def _subtype_closure(store, qualified_type):
     """``qualified_type`` and every declared (transitive) subtype of it --
-    mirrors ``vocabulary.is_subtype`` but walking the store's own
+    mirrors ``vocabulary.is_subclass`` but walking the store's own
     ``subClassOf`` triples instead of the in-process vocabulary index."""
     parents = _type_parents(store)
     children = {}

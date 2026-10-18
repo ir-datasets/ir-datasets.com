@@ -124,7 +124,8 @@ def build(out='dist', providers=None):
       branch (rendered directly, not through the live ``/search`` route,
       since that route always passes ``rows=None`` -- see app.py's
       ``search()``).
-    * ``/types`` and ``/type/<qualified>`` for every known node type.
+    * ``/classes`` and ``/class/<qualified>`` for every known graph class, and
+      ``/properties`` and ``/property/<qualified>`` for every declared graph property.
     * ``/provider/<prefix>`` for every provider in ``providers`` -- same
       inlined-rows approach, via provider.html's static branch.
     * ``static/`` -- copied as-is (CSS; ``browse.js``/``nav.js`` are left out
@@ -191,8 +192,10 @@ def build(out='dist', providers=None):
         node_urls = [(name, _node_url(name)) for name in names]
 
     with app.test_request_context():
-        # The overview and one page per known node type (see app.py's types()/type_page()).
-        type_urls = ['/types'] + [url_for('type_page', qualified=t) for t in sorted(_type_graph()[0])]
+        # The overview and one page per known graph class and graph property (see app.py's
+        # classes()/class_page() and properties()/property_page()).
+        type_urls = ['/classes'] + [url_for('class_page', qualified=t) for t in sorted(_type_graph()[0])]
+        type_urls += ['/properties'] + [url_for('property_page', qualified=q) for q in sorted(v2.graph_properties())]
 
     with app.test_client() as client:
         for name, url in tqdm(node_urls, desc='node pages', unit='page'):

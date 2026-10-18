@@ -3,7 +3,7 @@
 {% block title %}{{ node.qualified_name }} &mdash; ir-datasets.com{% endblock %}
 {% block content %}
 {% set replaced_by = [] %}
-{% for subject, kind, object, other in triples if kind == 'irds:alias_of' %}
+{% for subject, kind, object, other in triples if kind == 'irds:aliasOf' %}
 {% set _ = replaced_by.append(object) %}
 {% endfor %}
 

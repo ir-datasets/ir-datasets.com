@@ -14,8 +14,7 @@
         <div class="acq-title">Overview</div>
         <div class="acq-rows">
 {{ m.type_row(node) }}
-          {% if node.metadata.metrics %}<div class="acq-row"><span class="acq-label">Measures</span><span>{% for m in node.metadata.metrics %}<code>{{ m }}</code>{% if not loop.last %}, {% endif %}{% endfor %}</span></div>{% endif %}
-          <div class="acq-row"><span class="acq-label">Tables</span><span>{% for entity in ['docs', 'queries', 'qrels', 'scoreddocs', 'docpairs', 'answers'] if node.edge(entity) is not none %}<code>{{ entity }}</code>{% if not loop.last %}, {% endif %}{% endfor %}</span></div>
+          {% if node.metadata.metric %}<div class="acq-row"><span class="acq-label">Measures</span><span>{% for m in node.metadata.metric %}<code>{{ m }}</code>{% if not loop.last %}, {% endif %}{% endfor %}</span></div>{% endif %}
 {{ m.citation_row(node) }}
 {{ m.license_row(node) }}
         </div>
@@ -79,9 +78,9 @@
    table's own derived_from edge), not one level up by convention. Showing
    node.derived_from/node.filter here would describe a relationship with no
    backing edge; that provenance is instead visible on the derived facet's own
-   page (follow a Tables link above), via a real edge. #}
+   page (follow a table link below), via a real edge. #}
 
-{{ m.use_it_section(snippet, snippet_config, package=package, requires=requires) }}
+{{ m.use_it_section(snippet, snippet_config, package=package, requires=requires, variants=snippet_variants) }}
 
 {{ m.triples_section(raw_triples, node.qualified_name) }}
 {% endcall %}

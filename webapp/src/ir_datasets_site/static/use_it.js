@@ -35,3 +35,23 @@
     });
   });
 })();
+
+/* The pill row above the example: show the chosen variant's pane. */
+(function () {
+  var bars = document.querySelectorAll('[data-variant-pills]');
+  bars.forEach(function (bar) {
+    var card = bar.parentNode;
+    bar.addEventListener('click', function (e) {
+      var pill = e.target.closest('[data-variant]');
+      if (!pill) return;
+      bar.querySelectorAll('[data-variant]').forEach(function (p) {
+        var on = p === pill;
+        p.classList.toggle('active', on);
+        p.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+      card.querySelectorAll('[data-variant-pane]').forEach(function (pane) {
+        pane.hidden = pane.getAttribute('data-variant-pane') !== pill.getAttribute('data-variant');
+      });
+    });
+  });
+})();

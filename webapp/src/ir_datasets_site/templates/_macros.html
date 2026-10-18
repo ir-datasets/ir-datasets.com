@@ -43,9 +43,9 @@
   <tbody>
   {% for subject, predicate, object, kind, graph in raw_triples %}
   <tr>
-    <td class="text-nowrap">{% if subject == self_name %}<code class="text-secondary">{{ subject }}</code>{% else %}<a href="{{ node_url(subject) }}">{{ node_code(subject) }}</a>{% endif %}</td>
-    <td class="text-nowrap"><code>{{ predicate }}</code></td>
-    <td>{% if kind == 'node' %}{% if object == self_name %}<code class="text-secondary">{{ object }}</code>{% else %}<a href="{{ node_url(object) }}">{{ node_code(object) }}</a>{% endif %}{% elif kind == 'type' %}<code>{{ object }}</code>{% else %}<span class="text-break">{{ object }}</span>{% endif %}</td>
+    <td class="text-nowrap">{% if subject == self_name %}<code class="text-success">{{ subject }}</code>{% else %}<a href="{{ node_url(subject) }}">{{ node_code(subject) }}</a>{% endif %}</td>
+    <td class="text-nowrap"><a href="{{ url_for('property_page', qualified=predicate) }}"><code>{{ predicate }}</code></a></td>
+    <td>{% if kind == 'node' %}{% if object == self_name %}<code class="text-success">{{ object }}</code>{% else %}<a href="{{ node_url(object) }}">{{ node_code(object) }}</a>{% endif %}{% elif kind == 'type' %}<a href="{{ url_for('class_page', qualified=object) }}"><code>{{ object }}</code></a>{% else %}<code class="text-break">{{ object }}</code>{% endif %}</td>
     <td class="text-nowrap"><code>{{ graph }}</code></td>
   </tr>
   {% endfor %}
@@ -63,21 +63,24 @@
 {% endif %}
 {% endmacro %}
 
-{# Installation, as the first part of a Use It card: one copyable command for the
-   package this node comes from plus any extra packages it needs. Only when there
-   are extra packages is there anything to say, and then it's an alert. #}
-{% macro install_block(package, requires) %}
+{# The install command for a Use It card's header actions: the package this node
+   comes from plus any extra packages it needs. #}
+{% macro install_action(package, requires) %}
+{% set command = 'pip install ' ~ (([package] if package else []) + ((requires or []) | list)) | join(' ') %}
 {% if package or requires %}
-<div class="card-body border-bottom py-2" id="install">
-  <div class="text-secondary small mb-1">Install</div>
-  <pre class="bg-secondary-lt p-2 mb-0 overflow-auto"><code class="language-bash">pip install {{ ([package] if package else []) | join(' ') }}{% if requires %}{{ ' ' if package else '' }}{{ requires | join(' ') }}{% endif %}</code></pre>
-  {% if requires %}
-  <div class="alert alert-warning mt-2 mb-0 py-2" role="alert">
-    <strong>Extra dependencies needed:</strong>
-    {% for r in requires %}<a href="https://pypi.org/project/{{ r }}/" class="badge bg-yellow-lt text-reset"><code>{{ r }}</code></a> {% endfor %}
-    &mdash; not installed with the default install.
-  </div>
-  {% endif %}
+<div class="card-actions" id="install">
+  <code class="text-secondary">{{ command }}</code>
+</div>
+{% endif %}
+{% endmacro %}
+
+{# Extra packages a node needs beyond the default install: an orange badge, then links to
+   the packages after it (not inside it). Nothing at all when there are none. #}
+{% macro extra_dependencies_note(requires) %}
+{% if requires %}
+<div class="border-bottom px-3 py-2 d-flex align-items-center">
+  <span class="badge badge-sm bg-orange-lt">Extra {{ 'Packages' if requires|length > 1 else 'Package' }} Required</span>
+  <span class="ms-2 small">{% for r in requires %}<a href="https://pypi.org/project/{{ r }}/"><code>{{ r }}</code></a>{% if not loop.last %}, {% endif %}{% endfor %}</span>
 </div>
 {% endif %}
 {% endmacro %}
@@ -101,10 +104,10 @@
 {% endif %}
 {% endmacro %}
 
-{% macro use_it_section(snippet, config=none, package=none, requires=none) %}
+{% macro use_it_section(snippet, config=none, package=none, requires=none, variants=none) %}
 <div class="card mt-3 spy-target" id="use-it">
-  <div class="card-header"><h3 class="card-title">Use It</h3></div>
-  {{ install_block(package, requires) }}
+  <div class="card-header"><h3 class="card-title">Use It</h3>{{ install_action(package, requires) }}</div>
+  {{ extra_dependencies_note(requires) }}
   {% if config %}
   <div class="card-body border-bottom py-2 d-flex flex-wrap gap-3 align-items-center" data-use-it-config='{{ config|tojson|forceescape }}'>
     {% for facet in config.facets if facet.options|length > 1 %}
@@ -116,7 +119,16 @@
     {% endfor %}
   </div>
   {% endif %}
-  <pre class="bg-secondary-lt p-3 overflow-auto mb-0" style="border-radius: 0"><code class="language-python">{{ snippet }}</code></pre>
+  {#- One entry per way of using the node. Only the Python API exists for v2 so far
+      (the CLI / PyTerrier / XPM-IR integrations don't resolve v2 names yet); add
+      an entry (id, label, language, code) and its pill appears. -#}
+  {% set variants = variants or [{'id': 'python', 'label': 'Python API', 'lang': 'python', 'code': snippet}] %}
+  <div class="px-3 pt-3 pb-3 variant-pills" role="group" aria-label="Usage example" data-variant-pills>
+    {% for v in variants %}<button type="button" class="variant-pill{% if loop.first %} active{% endif %}" data-variant="{{ v.id }}" aria-pressed="{{ 'true' if loop.first else 'false' }}">{{ v.label }}</button>{% endfor %}
+  </div>
+  {% for v in variants %}
+  <pre class="bg-secondary-lt p-3 overflow-auto mb-0" style="border-radius: 0" data-variant-pane="{{ v.id }}"{% if not loop.first %} hidden{% endif %}><code class="language-{{ v.lang }}">{{ v.code }}</code></pre>
+  {% endfor %}
 </div>
 {% endmacro %}
 
@@ -143,7 +155,7 @@
    key links to its official dblp.org record, a ``doi:`` one to doi.org. #}
 {% macro citation_row(node) %}
 {% if node.metadata.citation %}
-          <div class="acq-row"><span class="acq-label">Citation</span><span>{% for c in node.metadata.citation %}{% if not loop.first %}<br>{% endif %}{% if c.startswith('dblp:') %}<a href="https://dblp.org/rec/{{ c[5:] }}.html?view=bibtex" target="_blank" rel="noopener"><code>{{ c }}</code></a>{% elif c.startswith('doi:') %}<a href="https://doi.org/{{ c[4:] }}" target="_blank" rel="noopener"><code>{{ c }}</code></a>{% elif node_exists(c) %}<a href="{{ node_url(c) }}">{{ node_code(c) }}</a>{% else %}<code>{{ c }}</code>{% endif %}{% endfor %}</span></div>
+          <div class="acq-row"><span class="acq-label">Citation</span><span>{% for c in node.metadata.citation %}{% if not loop.first %}<br>{% endif %}{% if c.startswith('@') %}<details class="bibtex"><summary>{{ c.split(',')[0].split('{')[1] if '{' in c.split(',')[0] else 'BibTeX' }} <span class="text-secondary">(BibTeX)</span></summary><pre class="mb-0 small">{{ c }}</pre></details>{% elif c.startswith('dblp:') %}<a href="https://dblp.org/rec/{{ c[5:] }}.html?view=bibtex" target="_blank" rel="noopener"><code>{{ c }}</code></a>{% elif c.startswith('doi:') %}<a href="https://doi.org/{{ c[4:] }}" target="_blank" rel="noopener"><code>{{ c }}</code></a>{% elif node_exists(c) %}<a href="{{ node_url(c) }}">{{ node_code(c) }}</a>{% else %}<code>{{ c }}</code>{% endif %}{% endfor %}</span></div>
 {% endif %}
 {% endmacro %}
 
@@ -157,8 +169,8 @@
 {% endmacro %}
 
 {# The node's description: plain text at the top of its Overview card. #}
-{% macro desc_para(node) %}{% if node.metadata.desc %}
-    <p>{{ node.metadata.desc }}</p>
+{% macro desc_para(node) %}{% if node.metadata.description %}
+    <p>{{ node.metadata.description }}</p>
 {% endif %}{% endmacro %}
 
 {# The generic (gray) box icon leading every node's Overview box. #}
@@ -170,7 +182,7 @@
 
 {# First row of the Overview box: the node's type, as its badge. #}
 {% macro type_row(node) %}
-          <div class="acq-row"><span class="acq-label">Type</span><span>{% for t in node_types(node) %}<a href="{{ url_for('type_page', qualified=t) }}" class="badge badge-sm {{ type_badge_class(t) }}">{{ type_label(t) }}</a> {% endfor %}</span></div>
+          <div class="acq-row"><span class="acq-label">Type</span><span>{% for t in node_types(node) %}<a href="{{ url_for('class_page', qualified=t) }}" class="badge badge-sm {{ type_badge_class(t) }}">{{ type_label(t) }}</a> {% endfor %}</span></div>
 {% endmacro %}
 
 {# A language literal (``lang2:zh`` ISO 639-1, ``lang3:zho`` ISO 639-3) as a link
@@ -178,3 +190,10 @@
    three-letter vocabulary is ISO 639-2, so a 639-3-only code links to a page
    that doesn't exist there; anything not of that form is shown as plain text. #}
 {% macro language_link(value) %}{% if value.startswith('lang2:') %}<a href="http://id.loc.gov/vocabulary/iso639-1/{{ value[6:] }}" target="_blank" rel="noopener"><code>{{ value[6:] }}</code></a>{% elif value.startswith('lang3:') %}<a href="http://id.loc.gov/vocabulary/iso639-2/{{ value[6:] }}" target="_blank" rel="noopener"><code>{{ value[6:] }}</code></a>{% else %}<code>{{ value }}</code>{% endif %}{% endmacro %}
+
+{# A record's columns as an indented list, one line each; a column that holds nested
+   records lists their columns beneath it, one level deeper. #}
+{% macro column_list(columns, depth=1) %}
+{% for c in columns %}<div style="padding-left: {{ 0.5 + (depth - 1) * 1.5 }}rem"><span class="text-secondary">[{{ c.order if c.order is defined and c.order is not none else loop.index0 }}]</span> {{ c.name }}{% if c.data_type %}: {{ c.data_type }}{{ '?' if c.nullable }}{% endif %}</div>
+{% if c.fields %}{{ column_list(c.fields, depth + 1) }}{% endif %}{% endfor %}
+{% endmacro %}

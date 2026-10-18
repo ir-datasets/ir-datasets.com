@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}Classes &mdash; ir-datasets.com{% endblock %}
+{% block content %}
+<h2 class="mb-3">Classes</h2>
+<div class="card">
+  <div class="list-group list-group-flush">
+    {% for entry in roots %}{{ m.type_tree(entry, 0) }}{% endfor %}
+  </div>
+</div>
+{% endblock %}

@@ -4,7 +4,7 @@
 {% block content %}
 
 {% set validates = [] %}
-{% for subject, kind, object, other in triples if kind == 'irds:validated_by' and object == node.qualified_name %}
+{% for subject, kind, object, other in triples if kind == 'irds:directoryManifest' and object == node.qualified_name %}
 {% set _ = validates.append(subject) %}
 {% endfor %}
 {% set sections = [('overview', 'Overview')]
@@ -12,7 +12,7 @@
   + [('use-it', 'Use It')]
   + [('raw-triples', 'Raw Triples')] %}
 {% call m.spy_layout(sections, node) %}
-{% set manual_sources = node.metadata.sources | default([]) | selectattr('kind', 'equalto', 'manual') | list %}
+{% set manual_sources = node.metadata.source | default([]) | selectattr('type', 'equalto', 'manual') | list %}
 <div class="card spy-target" id="overview">
   <div class="card-body">
 {{ m.desc_para(node) }}
@@ -23,7 +23,7 @@
         <div class="acq-rows">
 {{ m.type_row(node) }}
           <div class="acq-row"><span class="acq-label">Kind</span><span>{{ {'file': 'File', 'directory': 'Directory', 'git': 'Git repository'}[resource_kind] }}</span></div>
-          {% if node.metadata.size %}<div class="acq-row"><span class="acq-label">Size</span><span>{{ node.metadata.size | human_size }}</span></div>{% endif %}
+          {% if node.metadata.fileSize %}<div class="acq-row"><span class="acq-label">Size</span><span>{{ node.metadata.fileSize | human_size }}</span></div>{% endif %}
 {{ m.citation_row(node) }}
 {{ m.license_row(node) }}
           {% if node.metadata.dua %}<div class="acq-row"><span class="acq-label">DUA</span><span>{{ node.metadata.dua }}</span></div>{% endif %}
@@ -86,12 +86,13 @@
       <div class="acq-main">
         <div class="acq-title">Automatic Download</div>
         <div class="acq-rows">
-          {% for src in node.metadata.sources %}
+          {% for src in node.metadata.source %}
           <div class="acq-row">
             <span class="acq-label">{{ 'Source' if loop.first else 'Fallback' }}</span>
             <span>
               <a href="{{ src.url }}" target="_blank" rel="noopener"><code class="text-break">{{ src.url }}</code></a>
-              {% if src.kind == 'gdrive' %}<span class="badge bg-blue-lt ms-1">Google Drive</span>{% endif %}
+              {% if is_google_drive(src.url) %}<span class="badge bg-blue-lt ms-1">Google Drive</span>{% endif %}
+              {% if is_irds_mirror(src.url) %}<span class="badge bg-green-lt ms-1">ir-datasets mirror</span>{% endif %}
               {% if src.auth %}<span class="badge bg-orange-lt ms-1">requires authentication</span>{% endif %}
             </span>
           </div>
@@ -110,7 +111,7 @@
       <div class="acq-main">
         <div class="acq-title">Automatic Validation on {{ 'First Access' if manual_sources else 'Download' }}</div>
         <div class="acq-rows">
-          {% for spec in validation.hashes %}
+          {% for spec in node.metadata['fileHash'] | default([]) | sort %}
           {% set algo, digest = spec.split(':', 1) %}
           <div><code class="text-break">{{ algo }}(file) == '{{ digest }}'</code></div>
           {% endfor %}
@@ -119,7 +120,7 @@
     </div>
     {% elif validation and validation.type == 'directory_manifest' %}
     {% set manifest_name = [] %}
-    {% for subject, kind, object, other in triples if kind == 'irds:validated_by' and subject == node.qualified_name %}
+    {% for subject, kind, object, other in triples if kind == 'irds:directoryManifest' and subject == node.qualified_name %}
     {% set _ = manifest_name.append(object) %}
     {% endfor %}
     <div class="acq acq-verify">
@@ -182,7 +183,7 @@
 </div>
 {% endif %}
 
-{{ m.use_it_section(snippet, package=package, requires=requires) }}
+{{ m.use_it_section(snippet, package=package, requires=requires, variants=snippet_variants) }}
 
 {{ m.triples_section(raw_triples, node.qualified_name) }}
 {% endcall %}

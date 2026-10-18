@@ -9,6 +9,8 @@
   + [('use-it', 'Use It'), ('raw-triples', 'Raw Triples')]
   + ([('frozen', 'Declared Facts')] if frozen else []) %}
 {% call m.spy_layout(sections, node) %}
+<div class="row g-3 align-items-start">
+<div class="col-xl">
 <div class="card spy-target" id="overview">
   <div class="card-body">
 {{ m.desc_para(node) }}
@@ -22,7 +24,6 @@
           {% if node.metadata.lang %}<div class="acq-row"><span class="acq-label">Language</span><span>{{ m.language_link(node.metadata.lang) }}</span></div>{% endif %}
           {% set count = frozen_count(node) %}
           {% if count is not none %}<div class="acq-row"><span class="acq-label">Rows</span><span>{{ '{:,}'.format(count) }}</span></div>{% endif %}
-          {% if record_fields %}<div class="acq-row"><span class="acq-label">Columns</span><span>{% for f in record_fields %}<code>{{ f }}</code>{% if not loop.last %}, {% endif %}{% endfor %}</span></div>{% endif %}
 {{ m.citation_row(node) }}
 {{ m.license_row(node) }}
         </div>
@@ -54,6 +55,23 @@
     </div>
     {% endif %}
   </div>
+</div>
+</div>
+{% if node.metadata.column or record_fields %}
+<div class="col-xl-auto record-box">
+<div class="card">
+  <div class="card-body font-monospace text-nowrap overflow-auto">
+    <div class="fw-bold">Record:</div>
+    {% if node.metadata.column %}
+    {{ m.column_list(node.metadata.column) }}
+    {% else %}
+    {% for f in record_fields %}<div class="ps-2"><span class="text-secondary">[{{ loop.index0 }}]</span> {{ f }}</div>
+    {% endfor %}
+    {% endif %}
+  </div>
+</div>
+</div>
+{% endif %}
 </div>
 
 {% if related.sources or related.derived_from or related.used_by or related.alternatives or related.alternative_of %}
@@ -148,7 +166,7 @@
 </div>
 {% endif %}
 
-{{ m.use_it_section(snippet, package=package, requires=requires) }}
+{{ m.use_it_section(snippet, package=package, requires=requires, variants=snippet_variants) }}
 
 {{ m.triples_section(raw_triples, node.qualified_name) }}
 {{ m.frozen_section(frozen) }}

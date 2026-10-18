@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}{{ entry.name }} &mdash; ir-datasets.com{% endblock %}
+{% block content %}
+<h2 class="mb-3 crumbs"><a href="{{ url_for('properties') }}">Properties</a> <span class="sep">&rsaquo;</span> <span class="select current"><code>{{ entry.name }}</code></span></h2>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <p>{{ (entry.desc or 'No description.')|inline_code }}</p>
+    <div class="acq-rows">
+      <div class="acq-row"><span class="acq-label">Kind</span><span>{{ {'node': 'edge (links a node to another node)', 'literal': 'literal property (a plain value)', 'json': 'literal property (a JSON document)', 'type': 'link to a graph class'}[entry.range] }}</span></div>
+      {% if entry.range == 'node' %}<div class="acq-row"><span class="acq-label">Structural</span><span>{{ 'yes &mdash; part of what a node is built from'|safe if entry.structural else 'no &mdash; informational' |safe }}</span></div>{% endif %}
+      <div class="acq-row"><span class="acq-label">Owner</span><span>{% if entry.owner in ('rdf', 'rdfs') %}<code>{{ entry.owner }}</code> (standard RDF){% else %}<a href="{{ url_for('provider', prefix=entry.owner) }}"><code>{{ entry.owner }}</code></a>{% endif %}</span></div>
+      <div class="acq-row"><span class="acq-label">Triples</span><span>{{ '{:,}'.format(entry.count) }}</span></div>
+    </div>
+  </div>
+</div>
+
+{% if rows %}
+<div class="card">
+  <div class="card-header"><h3 class="card-title">Examples</h3>
+    {% if entry.count > shown %}<div class="card-actions text-secondary">first {{ shown }} of {{ '{:,}'.format(entry.count) }}</div>{% endif %}
+  </div>
+  <div class="table-responsive">
+  <table class="table table-vcenter card-table table-sm">
+    <thead><tr><th class="w-1 text-nowrap">Subject</th><th class="w-1 text-nowrap">Predicate</th><th>Object</th></tr></thead>
+    <tbody>
+    {% for subject, object, kind in rows %}
+    <tr>
+      <td class="text-nowrap">{% if kind == 'type' and entry.name == 'rdfs:subClassOf' %}<a href="{{ url_for('class_page', qualified=subject) }}"><code>{{ subject }}</code></a>{% else %}<a href="{{ node_url(subject) }}">{{ node_code(subject) }}</a>{% endif %}</td>
+      <td class="text-nowrap"><code class="text-success">{{ entry.name }}</code></td>
+      <td>{% if kind == 'node' %}<a href="{{ node_url(object) }}">{{ node_code(object) }}</a>{% elif kind == 'type' %}<a href="{{ url_for('class_page', qualified=object) }}"><code>{{ object }}</code></a>{% else %}<code class="text-break">{{ object }}</code>{% endif %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

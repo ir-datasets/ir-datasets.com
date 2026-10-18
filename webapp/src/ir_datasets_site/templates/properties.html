@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}Properties &mdash; ir-datasets.com{% endblock %}
+{% block content %}
+<h2 class="mb-3">Properties</h2>
+{% for owner, entries in groups %}
+<div class="card mb-3">
+  <div class="card-header"><h3 class="card-title"><code>{{ owner }}</code></h3></div>
+  <div class="list-group list-group-flush">
+    {% for e in entries %}
+    <div class="list-group-item py-2">
+      <div class="d-flex align-items-center">
+        <a href="{{ e.url }}"><code>{{ e.name }}</code></a>
+        <span class="badge badge-sm align-middle ms-2 bg-secondary-lt">{{ {'node': 'edge', 'literal': 'literal', 'json': 'json', 'type': 'class link'}[e.range] }}</span>
+        {% if e.structural %}<span class="badge badge-sm align-middle ms-1 bg-secondary-lt">structural</span>{% endif %}
+        <span class="ms-auto text-secondary">{{ '{:,}'.format(e.count) }}</span>
+      </div>
+      {% if e.desc %}<div class="text-secondary small">{{ e.desc }}</div>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endfor %}
+{% endblock %}

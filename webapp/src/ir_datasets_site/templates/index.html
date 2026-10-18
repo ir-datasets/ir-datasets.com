@@ -26,7 +26,7 @@
     <p class="ms-4"><a href="{{ url_for('search', type='irds:Table') }}" class="badge badge-cat-table">Tables</a> parse <strong class="text-cat-resource">Data</strong> into records with a consistent structure. Example: <a href="/n/irds:msmarco-passage"><code>irds:msmarco-passage</code></a></p>
     <p class="ms-4"><a href="{{ url_for('search', type='irds:Bundle') }}" class="badge badge-cat-bundle">Bundles</a> are collections of <strong class="text-cat-table">Tables</strong> and other <strong class="text-cat-bundle">Bundles</strong>. Examples: <a href="/n/irds:antique-test"><code>irds:antique-test</code></a> (a <a href="{{ url_for('search', type='irds:Benchmark') }}">Benchmark</a>) and <a href="/n/irds:bright"><code>irds:bright</code></a> (a <a href="{{ url_for('search', type='irds:Suite') }}">Suite</a>).</p>
 
-    <p>See all <a href="{{ url_for('types') }}">types</a>, each with a description.</p>
+    <p>See all <a href="{{ url_for('classes') }}">classes</a> and <a href="{{ url_for('properties') }}">properties</a> of the graph, each with a description.</p>
 
     <p class="mb-0">Providers: {% for prefix in providers %}<a href="{{ url_for('provider', prefix=prefix) }}"><code>{{ prefix }}</code></a>{% if not loop.last %}, {% endif %}{% endfor %}</p>
   </div>

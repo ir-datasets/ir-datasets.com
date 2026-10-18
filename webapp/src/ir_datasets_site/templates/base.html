@@ -17,7 +17,6 @@
         <a href="{{ url_for('index') }}" class="text-white text-decoration-none">ir-datasets<span style="color: #999;">.com</span></a>
       </h1>
       <div class="navbar-nav flex-row order-md-last flex-fill align-items-center">
-        <a href="{{ url_for('types') }}" class="nav-link text-white-50 me-3">Types</a>
         <div class="nav-item flex-fill">
           {% block navbar_search %}
           {% if not static_build|default(false) %}

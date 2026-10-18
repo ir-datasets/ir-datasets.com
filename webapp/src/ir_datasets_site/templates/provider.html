@@ -8,13 +8,12 @@
   <div class="card-body">
     <div class="row">
       <div class="col-6 col-md-3"><div class="text-secondary">Package</div><div>{{ provider.package or '&mdash;' }}</div></div>
-      <div class="col-6 col-md-3"><div class="text-secondary">Node types declared</div><div>
-        {% for t in manifest.types.keys()|sort %}<code>{{ t }}</code>{% if not loop.last %}, {% endif %}{% endfor %}
+      <div class="col-6 col-md-3"><div class="text-secondary">Graph classes declared</div><div>
+        {% for t in manifest.classes.keys()|sort %}<a href="{{ url_for('class_page', qualified=t) }}"><code>{{ t }}</code></a>{% if not loop.last %}, {% endif %}{% endfor %}
       </div></div>
-      <div class="col-6 col-md-3"><div class="text-secondary">Edge kinds declared</div><div>
-        {% for k, info in manifest.edge_kinds.items()|sort %}<code>{{ k }}</code>{{ ' (structural)' if info.structural else '' }}{% if not loop.last %}, {% endif %}{% endfor %}
+      <div class="col-6 col-md-3"><div class="text-secondary">Graph properties declared</div><div>
+        {% for k, info in manifest.properties.items()|sort %}<a href="{{ url_for('property_page', qualified=k) }}"><code>{{ k }}</code></a>{{ ' (structural)' if info.structural else '' }}{% if not loop.last %}, {% endif %}{% endfor %}
       </div></div>
-      <div class="col-6 col-md-3"><div class="text-secondary">Defaultable fields</div><div>{{ manifest.defaultable|join(', ') or '&mdash;' }}</div></div>
     </div>
   </div>
 </div>

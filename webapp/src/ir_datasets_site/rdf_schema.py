@@ -13,13 +13,15 @@ query never needs to filter rdf:type/rdfs:subClassOf out by hand:
     NODE  http://ir-datasets.com/id/<qualified-name>       -- a node
     TYPE  http://ir-datasets.com/ns/type#<qualified-type>  -- a node's class
     EDGE  http://ir-datasets.com/ns/edge#<qualified-kind>  -- edge-kind predicate
-    META  http://ir-datasets.com/ns/meta#<field-name>      -- literal-property predicate
+    META  http://ir-datasets.com/ns/meta#<qualified-property> -- literal-property predicate
 
 ``export_triples()``'s triples come as ``(subject, predicate, object)`` where
-``predicate`` is either ``'type'``/``'subClassOf'`` (special-cased below) or a
-qualified edge kind (when ``object`` is a plain qualified name) or a plain
-field name (when ``object`` is a ``v2.Literal`` -- ir_datasets's own RDF-style
-literal marker, unrelated to ``typing.Literal`` -- mapped under META).
+every ``predicate`` is a declared, qualified name: ``rdf:type`` /
+``rdfs:subClassOf`` (special-cased below), a qualified edge kind (when
+``object`` is a plain qualified name, mapped under EDGE) or a qualified
+property such as ``irds:description`` (when ``object`` is a ``v2.Literal`` --
+ir_datasets's own RDF-style literal marker, unrelated to ``typing.Literal`` --
+mapped under META; a ``json`` property's literal is typed ``rdf:JSON``).
 
 Every quad also gets a **named graph**: a triple's own subject's provider
 prefix (``irds``, ``hf``, ``clirmatrix``, ``legacy``), so the store's native
@@ -47,12 +49,13 @@ GRAPH = 'http://ir-datasets.com/provider/'
 RDF_TYPE = ox.NamedNode('http://www.w3.org/1999/02/22-rdf-syntax-ns#type')
 RDFS_SUBCLASS_OF = ox.NamedNode('http://www.w3.org/2000/01/rdf-schema#subClassOf')
 XSD_INTEGER = ox.NamedNode('http://www.w3.org/2001/XMLSchema#integer')
+#: A literal that holds a JSON document (a ``json``-range property).
+RDF_JSON = ox.NamedNode('http://www.w3.org/1999/02/22-rdf-syntax-ns#JSON')
 
-#: Manifest-row fields that describe *attestation* (freeze --verify output),
-#: not descriptive metadata -- kept in their own bucket so ``node_data()``
-#: can hand templates the same shape ``Node._frozen()`` always did.
-FROZEN_FIELDS = {'count', 'content_sha256', 'hash_scheme', 'record_schema',
-                 'samples', 'commit', 'hashes_confirmed', 'score_counts'}
+#: Properties shown as declared facts rather than descriptive metadata -- kept in
+#: their own bucket so ``node_data()`` hands templates the same shape
+#: ``Node._frozen()`` always did. (Local names; see ``graph_queries.node_data``.)
+FROZEN_FIELDS = {'count', 'commit'}
 
 
 #: A qualified name is otherwise free-form (``hf:`` fragments in particular
@@ -150,14 +153,18 @@ def to_quads(triples):
         try:
             s = node_iri(subject)
             g = graph_iri(graph_for(subject))
-            if predicate == 'type':
+            if predicate == 'rdf:type':
                 yield ox.Quad(s, RDF_TYPE, type_iri(obj), g)
-            elif predicate == 'subClassOf':
+            elif predicate == 'rdfs:subClassOf':
                 yield ox.Quad(type_iri(subject), RDFS_SUBCLASS_OF, type_iri(obj), g)
             elif isinstance(obj, _V2Literal):
                 value = obj.value
-                literal = ox.Literal(str(value), datatype=XSD_INTEGER) if isinstance(value, int) \
-                    else ox.Literal(str(value))
+                if getattr(obj, 'datatype', None) == 'json':
+                    literal = ox.Literal(str(value), datatype=RDF_JSON)
+                elif isinstance(value, int):
+                    literal = ox.Literal(str(value), datatype=XSD_INTEGER)
+                else:
+                    literal = ox.Literal(str(value))
                 yield ox.Quad(s, meta_iri(predicate), literal, g)
             else:
                 yield ox.Quad(s, edge_iri(predicate), node_iri(obj), g)

@@ -10,13 +10,14 @@
 site has a dedicated template for yet &mdash; likely a third-party provider's
 own vocabulary. Showing its raw metadata and edges instead.</p>
 <div class="card spy-target" id="overview">
-  {% if node.metadata.desc %}<div class="card-body border-bottom">{{ m.desc_para(node) }}</div>{% endif %}
+  {% if node.metadata.description %}<div class="card-body border-bottom">{{ m.desc_para(node) }}</div>{% endif %}
   <div class="table-responsive">
   <table class="table table-vcenter card-table">
   <tbody>
-  <tr><td class="text-secondary w-1">type</td><td>{% for t in node_types(node) %}<a href="{{ url_for('type_page', qualified=t) }}" class="badge badge-sm {{ type_badge_class(t) }}">{{ type_label(t) }}</a> {% endfor %}</td></tr>
-  {% for key, value in node.metadata.items()|sort %}
-  <tr><td class="text-secondary w-1">{{ key }}</td><td>{{ value }}</td></tr>
+  <tr><td class="text-secondary w-1">type</td><td>{% for t in node_types(node) %}<a href="{{ url_for('class_page', qualified=t) }}" class="badge badge-sm {{ type_badge_class(t) }}">{{ type_label(t) }}</a> {% endfor %}</td></tr>
+  {# Every value of every property (a graph property can have several); a live node has only its metadata. #}
+  {% for key, value in (node.values if node.values is defined and node.values else node.metadata).items()|sort %}
+  <tr><td class="text-secondary w-1">{{ key }}</td><td>{% for v in (value if value is sequence and value is not string else [value]) %}{% if not loop.first %}<br>{% endif %}{% if v is mapping %}<code class="text-break">{{ v|tojson }}</code>{% else %}{{ v }}{% endif %}{% endfor %}</td></tr>
   {% endfor %}
   </tbody>
   </table>

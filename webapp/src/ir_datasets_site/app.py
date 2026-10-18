@@ -204,7 +204,7 @@ def _category_of(t):
     node's own type falls under -- ``None`` if it isn't a (transitive)
     subtype of any of them (an unknown third-party type)."""
     for category in TYPE_LABELS:
-        if v2.is_subtype(t, category):
+        if v2.is_subclass(t, category):
             return category
     return None
 
@@ -254,8 +254,7 @@ def _frozen_count(table):
 def _provider_vocab(p):
     """What provider.html shows about a provider's declared vocabulary, read
     from the live provider (there is no manifest any more)."""
-    return {'types': dict(p.types), 'edge_kinds': dict(p.edge_kinds),
-            'defaultable': sorted(p.defaultable_fields), 'aliases': {}}
+    return {'classes': dict(p.graph_classes), 'properties': dict(p.graph_properties), 'aliases': {}}
 
 
 def _package_of(node):
@@ -331,9 +330,9 @@ def _pretty_samples(frozen, fields=()):
 
 
 def _record_fields(node):
-    """A table's column names, as reported at discovery (``columns`` on the
-    node -- see ``Table.discovery_literals``), ``None`` if it had none."""
-    return node.metadata.get('columns') or None
+    """A table's column names in order, from its ``irds:column`` documents (see
+    ``Table.discovery_literals``), ``None`` if it had none."""
+    return [c['name'] for c in node.metadata.get('column') or []] or None
 
 
 def _python_snippet(node):
@@ -341,7 +340,7 @@ def _python_snippet(node):
     supports today (no CLI/PyTerrier/XPM-IR generators yet; see
     ../PLAN_V2_SITE.md's reuse table)."""
     name = node.qualified_name
-    if v2.is_subtype(node.type, v2.BENCHMARK):
+    if v2.is_subclass(node.type, v2.BENCHMARK):
         singular = {'docs': 'doc', 'queries': 'query', 'qrels': 'qrel',
                     'scoreddocs': 'scoreddoc', 'docpairs': 'docpair', 'answers': 'answer'}
         lines = ["import ir_datasets.v2", f"ds = ir_datasets.v2.load({name!r})"]
@@ -354,15 +353,100 @@ def _python_snippet(node):
             comment = f"  # {singular[entity]}.[{', '.join(fields)}]" if fields else ''
             lines.append(f"    ...{comment}")
         return '\n'.join(lines)
-    if v2.is_subtype(node.type, v2.TABLE):
+    if v2.is_subclass(node.type, v2.TABLE):
         return (f"import ir_datasets.v2\n"
                 f"table = ir_datasets.v2.load({name!r})\n"
                 f"len(table)  # record count\n"
                 f"table[0]  # first record\n"
                 f"for record in table: ...")
-    if v2.is_subtype(node.type, v2.DATA):
+    if v2.is_subclass(node.type, v2.DATA):
         return _resource_snippet(node)
     return f"import ir_datasets.v2\nnode = ir_datasets.v2.load({name!r})"
+
+
+def _snippet_variants(node, triples=()):
+    """The Use It card's pills: ``[{'id', 'label', 'lang', 'code'}]``, the Python
+    API example first. Every example uses only what ``ir_datasets.v2`` supports
+    today -- there are no CLI/PyTerrier/XPM-IR examples because those don't
+    resolve v2 names."""
+    name = node.qualified_name
+    variants = [{'id': 'python', 'label': 'Python API', 'lang': 'python', 'code': _python_snippet(node)}]
+    if v2.is_subclass(node.type, v2.BENCHMARK):
+        head = f"import ir_datasets.v2\nds = ir_datasets.v2.load({name!r})\n"
+        tables = [(e, f'ds.{e}', _record_fields(node.edge(e))) for e in v2.ENTITIES
+                  if node.edge(e) is not None]
+    elif v2.is_subclass(node.type, v2.TABLE):
+        head = f"import ir_datasets.v2\ntable = ir_datasets.v2.load({name!r})\n"
+        tables = [(node.type.rpartition(':')[2].lower(), 'table', _record_fields(node))]
+    else:
+        return variants
+    # Pandas: a table's records are named tuples, so a DataFrame takes them directly
+    frames = [f"{e}_df = pd.DataFrame({expr})" + (f"  # columns: {', '.join(fields)}" if fields else '')
+              for e, expr, fields in tables]
+    if frames:
+        variants.append({'id': 'pandas', 'label': 'Pandas', 'lang': 'python',
+                         'code': 'import pandas as pd\n' + head + '\n'.join(frames)})
+    # Lookup by id (docs use the docstore; queries and answers are held in memory):
+    # part of the Python API example.
+    body = []
+    for entity, expr, _ in tables:
+        if entity == 'answers':
+            body.append(f"answers = {expr}.lookup('QUERY_ID')  # that query's answers")
+        elif entity in ('docs', 'queries'):
+            one = 'doc' if entity == 'docs' else 'query'
+            body.append(f"{one} = {expr}.lookup('ID')  # one record")
+            body.append(f"{entity}_by_id = {expr}.lookup(['ID1', 'ID2'])  # a dict of records")
+    if body:
+        variants[0]['code'] += '\n\n# look records up by id\n' + '\n'.join(body)
+    # Evaluation: qrels as ir_measures input
+    if any(e == 'qrels' for e, _, _ in tables):
+        qrels = 'ds.qrels' if v2.is_subclass(node.type, v2.BENCHMARK) else 'table'
+        variants.append({'id': 'evaluate', 'label': 'Evaluate', 'lang': 'python', 'code':
+            "import ir_datasets.v2\nimport ir_measures\nfrom ir_measures import nDCG, P\n"
+            + head.split('\n', 1)[1] +
+            "run = ...  # your system's output: a DataFrame or an iterable of scored-doc records\n"
+            f"print(ir_measures.calc_aggregate([nDCG@10, P(rel=1)@10], {qrels}, run))"})
+    xpm = _xpmir_snippet(node, tables, triples)
+    if xpm:
+        variants.append({'id': 'xpmir', 'label': 'XPM-IR', 'lang': 'python', 'code': xpm})
+    return variants
+
+
+def _v1_id(name, triples):
+    """The v1 id of a benchmark: the ``legacy:`` node that is an alias of it."""
+    for subject, kind, obj, other in triples:
+        if kind == 'irds:aliasOf' and obj == name and subject.startswith('legacy:'):
+            return subject.partition(':')[2]
+    return None
+
+
+def _xpmir_snippet(node, tables, triples):
+    """experimaestro-ir (datamaestro) addresses a dataset by its v1 id with dots
+    (``irds.antique.test``), so only a benchmark that still has one gets an example."""
+    if not v2.is_subclass(node.type, v2.BENCHMARK):
+        return None
+    v1 = _v1_id(node.qualified_name, triples)
+    if v1 is None:
+        return None
+    dm = 'irds.' + v1.replace('/', '.')
+    lines = ["# requires experimaestro-ir: pip install experimaestro-ir",
+             "from datamaestro import prepare_dataset"]
+    for entity, _, _ in tables:
+        if entity == 'docs':
+            lines += [f"documents = prepare_dataset('{dm}')",
+                      "for doc in documents.iter_documents(): ...  # an AdhocDocumentStore"]
+        elif entity == 'queries':
+            lines += [f"topics = prepare_dataset('{dm}.queries')  # AdhocTopics",
+                      "for topic in topics.iter(): ..."]
+        elif entity == 'qrels':
+            lines += [f"qrels = prepare_dataset('{dm}.qrels')  # AdhocAssessments",
+                      "for topic_qrels in qrels.iter(): ..."]
+        elif entity == 'scoreddocs':
+            lines += [f"run = prepare_dataset('{dm}.scoreddocs')  # AdhocRun"]
+        elif entity == 'docpairs':
+            lines += [f"docpairs = prepare_dataset('{dm}.docpairs')  # TrainingTriplets",
+                      "next(docpairs.iter())  # the first triplet"]
+    return '\n'.join(lines) if len(lines) > 2 else None
 
 
 def _snippet_config(node):
@@ -370,7 +454,7 @@ def _snippet_config(node):
     client-side (``static/use_it.js``): per facet that has alternatives, the
     default table and each alternative with its record fields. ``None`` when
     the node isn't a benchmark or nothing has alternatives."""
-    if not v2.is_subtype(node.type, v2.BENCHMARK):
+    if not v2.is_subclass(node.type, v2.BENCHMARK):
         return None
     singular = {'docs': 'doc', 'queries': 'query', 'qrels': 'qrel',
                 'scoreddocs': 'scoreddoc', 'docpairs': 'docpair', 'answers': 'answer'}
@@ -384,7 +468,7 @@ def _snippet_config(node):
         options = [{'name': table.qualified_name, 'fields': _record_fields(table) or [], 'note': None}]
         for alt in alts:
             view = gq.node_data(store, alt)
-            options.append({'name': alt, 'fields': (view.metadata.get('columns') if view else None) or [],
+            options.append({'name': alt, 'fields': (_record_fields(view) if view else None) or [],
                             'note': _alt_note(alt)})
         facets.append({'entity': entity, 'singular': singular[entity], 'options': options})
     return {'name': node.qualified_name, 'facets': facets} if any_alts else None
@@ -410,8 +494,8 @@ def _resource_snippet(node):
     authenticated download, or a plain downloadable file."""
     name = node.qualified_name
     meta = node.metadata
-    sources = meta.get('sources') or []
-    manual = [x for x in sources if x.get('kind') == 'manual']
+    sources = meta.get('source') or []
+    manual = [x for x in sources if x.get('type') == 'manual']
     head = f"import ir_datasets.v2\nres = ir_datasets.v2.load({name!r})\n"
     if meta.get('repo'):
         commit = _frozen_of(node).get('commit')
@@ -491,6 +575,29 @@ def _node_types(node):
 
 
 app.jinja_env.globals['node_types'] = _node_types
+
+
+def _host(url):
+    from urllib.parse import urlparse
+    try:
+        return (urlparse(url or '').hostname or '').lower()
+    except ValueError:
+        return ''
+
+
+def _is_google_drive(url):
+    """Whether a source URL is on Google Drive -- told from the host, not a source type."""
+    return _host(url) == 'drive.google.com'
+
+
+def _is_irds_mirror(url):
+    """Whether a source URL is on the ir-datasets community mirror -- told from the host."""
+    from ir_datasets.v2.sources import IRDS_MIRROR
+    return bool(_host(url)) and _host(url) == _host(IRDS_MIRROR)
+
+
+app.jinja_env.globals['is_google_drive'] = _is_google_drive
+app.jinja_env.globals['is_irds_mirror'] = _is_irds_mirror
 app.jinja_env.globals['type_badge_class'] = _type_badge_class
 app.jinja_env.globals['type_color'] = _type_color
 def _node_code(name, cls=''):
@@ -514,7 +621,7 @@ def _score_rows(node, frozen):
     score the table defines (``defs``) or that occurs in its frozen
     ``score_counts``, ordered numerically. ``meaning``/``count`` are None where
     the table doesn't define the score / hasn't been verified yet."""
-    defs = dict(node.metadata.get('defs') or {})
+    defs = {str(d['label']): d['meaning'] for d in node.metadata.get('relevanceLabel') or []}
     counts = dict((frozen or {}).get('score_counts') or {})
 
     def order(score):
@@ -679,13 +786,13 @@ def _type_description(t):
     """The ``desc`` a provider declared for node type ``t`` (``None`` if none, or
     its provider isn't installed) -- not stored in the graph, so read from the
     in-process vocabulary."""
-    return (v2.node_types().get(t) or {}).get('desc')
+    return (v2.graph_classes().get(t) or {}).get('desc')
 
 
 def _type_graph():
     """``(parents, children, counts)`` for every known type -- shared by
     the overview and each type's own page."""
-    declared = {t: info.get('parent') for t, info in v2.node_types().items()}
+    declared = {t: info.get('parent') for t, info in v2.graph_classes().items()}
     parents, children, _ = gq.type_hierarchy(store, declared)
     return parents, children, gq.counts_per_type(store, parents, providers=_selected_providers())
 
@@ -693,17 +800,55 @@ def _type_graph():
 def _type_entry(t, parents, children, counts):
     return {'name': t, 'label': _type_label(t), 'badge_class': _type_badge_class(t),
             'desc': _type_description(t), 'count': counts.get(t, 0),
-            'url': url_for('type_page', qualified=t),
+            'url': url_for('class_page', qualified=t),
             'children': [_type_entry(c, parents, children, counts) for c in children.get(t, [])]}
 
 
-@app.route('/types')
-def types():
-    """Every node type, as a tree (a type under its parent), each with its
+@app.route('/classes')
+def classes():
+    """Every graph class, as a tree (a type under its parent), each with its
     short description and how many nodes have it (counting subtypes)."""
     parents, children, counts = _type_graph()
     roots = [t for t in _ordered_types(parents, children) if parents.get(t) is None]
-    return render_template('types.html', roots=[_type_entry(t, parents, children, counts) for t in roots])
+    return render_template('classes.html', roots=[_type_entry(t, parents, children, counts) for t in roots])
+
+
+def _property_entries():
+    """Every declared graph property, as listing rows: ``{'name', 'owner', 'local',
+    'range', 'structural', 'desc', 'count', 'url'}``. Declarations come
+    from the live ``ir_datasets.v2`` vocabulary; counts from the store."""
+    declared = v2.graph_properties()
+    counts = gq.property_counts(store, declared, providers=_selected_providers())
+    return [{'name': q, 'owner': e['owner'], 'local': q.split(':', 1)[1], 'range': e['range'],
+             'structural': e['structural'], 'desc': e['desc'],
+             'count': counts.get(q, 0), 'url': url_for('property_page', qualified=q)}
+            for q, e in sorted(declared.items())]
+
+
+@app.route('/properties')
+def properties():
+    """Every declared graph property -- edges between nodes and literal-valued
+    properties -- grouped by the provider that owns it, each with its
+    description and how many triples use it."""
+    entries = _property_entries()
+    owners = sorted({e['owner'] for e in entries}, key=lambda o: (o in ('rdf', 'rdfs'), o))
+    groups = [(owner, [e for e in entries if e['owner'] == owner]) for owner in owners]
+    return render_template('properties.html', groups=groups)
+
+
+#: How many of a graph property's triples its own page lists inline.
+PROPERTY_PAGE_ROWS = 50
+
+
+@app.route('/property/<path:qualified>')
+def property_page(qualified):
+    entries = {e['name']: e for e in _property_entries()}
+    entry = entries.get(qualified)
+    if entry is None:
+        abort(404, f'{qualified!r} is not a declared graph property')
+    rows = gq.property_examples(store, qualified, entry['range'], providers=_selected_providers(),
+                                 limit=PROPERTY_PAGE_ROWS)
+    return render_template('property.html', entry=entry, rows=rows, shown=len(rows))
 
 
 def _protocol_info(t):
@@ -745,8 +890,8 @@ def _protocol_info(t):
 TYPE_PAGE_ROWS = 100
 
 
-@app.route('/type/<path:qualified>')
-def type_page(qualified):
+@app.route('/class/<path:qualified>')
+def class_page(qualified):
     parents, children, counts = _type_graph()
     if qualified not in parents:
         abort(404, f'{qualified!r} is not a known node type')
@@ -757,9 +902,9 @@ def type_page(qualified):
     rows, total = gq.list_nodes(store, type_filter=qualified, providers=_selected_providers(),
                                 limit=TYPE_PAGE_ROWS)
     return render_template(
-        'type.html', entry=_type_entry(qualified, parents, children, counts),
+        'class.html', entry=_type_entry(qualified, parents, children, counts),
         protocol=_protocol_info(qualified),
-        ancestors=[{'name': a, 'label': _type_label(a), 'url': url_for('type_page', qualified=a)}
+        ancestors=[{'name': a, 'label': _type_label(a), 'url': url_for('class_page', qualified=a)}
                    for a in reversed(ancestors)],
         rows=[_row_dict(name, ts) for name, ts in rows], total=total, shown=len(rows))
 
@@ -783,14 +928,14 @@ def provider(prefix):
 
 
 def _alternatives(name):
-    """Every table linked to ``name`` by ``irds:alternative_of`` in either
+    """Every table linked to ``name`` by ``irds:alternativeOf`` in either
     direction, transitively (``v2.alternatives`` over the materialized store
     rather than the live graph), excluding ``name`` itself."""
     seen, stack = {name}, [name]
     while stack:
         current = stack.pop()
         for subject, kind, obj, other in gq.triples_of(store, current):
-            if kind == 'irds:alternative_of' and other not in seen:
+            if kind == 'irds:alternativeOf' and other not in seen:
                 seen.add(other)
                 stack.append(other)
     return sorted(seen - {name})
@@ -800,7 +945,7 @@ def _alt_note(name):
     """The short ``alternative_note`` a table declares about how it differs
     from the table it is an alternative of, or ``None``."""
     view = gq.node_data(store, name)
-    return view.metadata.get('alternative_note') if view is not None else None
+    return view.metadata.get('alternativeNote') if view is not None else None
 
 
 def _related(n, triples):
@@ -813,24 +958,24 @@ def _related(n, triples):
            'suites': [], 'member_benchmarks': [], 'member_suites': [], 'members': [],
            'alternatives': [], 'alternative_of': [], 'alternative_note': None,
            'facet_alternatives': {}}
-    if v2.is_subtype(n.type, v2.TABLE):
+    if v2.is_subclass(n.type, v2.TABLE):
         # Direct edges only: what this table is an alternative of (with its
         # own note on how it differs), and the tables that are alternatives of it.
         out['alternative_of'] = [obj for subject, kind, obj, other in triples
-                                 if subject == name and kind == 'irds:alternative_of']
+                                 if subject == name and kind == 'irds:alternativeOf']
         out['alternative_note'] = _alt_note(name)
         out['alternatives'] = [(subject, _alt_note(subject)) for subject, kind, obj, other in triples
-                               if obj == name and kind == 'irds:alternative_of']
-    elif v2.is_subtype(n.type, v2.BENCHMARK):
+                               if obj == name and kind == 'irds:alternativeOf']
+    elif v2.is_subclass(n.type, v2.BENCHMARK):
         for entity in v2.ENTITIES:
             table = n.edge(entity)
             if table is not None and (alts := _alternatives(table.qualified_name)):
                 out['facet_alternatives'][entity] = [(a, _alt_note(a)) for a in alts]
     facet_kinds = {f'irds:{e}' for e in v2.ENTITIES}
     for subject, kind, obj, other in triples:
-        if subject == name and kind == 'irds:derived_from':
+        if subject == name and kind == 'irds:derivedFrom':
             target = gq.node_data(store, obj)
-            is_resource = target is not None and v2.is_subtype(target.type, v2.DATA)
+            is_resource = target is not None and v2.is_subclass(target.type, v2.DATA)
             out['sources' if is_resource else 'derived_from'].append(obj)
         elif subject == name and kind == 'irds:filtered_by':
             out['filtered_by'].append(obj)
@@ -840,13 +985,13 @@ def _related(n, triples):
             out['suites'].append(subject)
         elif subject == name and kind == 'irds:member':
             target = gq.node_data(store, obj)
-            is_suite = target is not None and v2.is_subtype(target.type, v2.SUITE)
+            is_suite = target is not None and v2.is_subclass(target.type, v2.SUITE)
             out['member_suites' if is_suite else 'member_benchmarks'].append(obj)
             out['members'].append({'name': obj, 'type': target.type if target else None})
     # A table's sources are auto-downloadable unless any needs a manual download.
     out['sources_manual'] = any(
-        x.get('kind') == 'manual'
-        for src in out['sources'] for x in (getattr(gq.node_data(store, src), 'metadata', None) or {}).get('sources') or [])
+        x.get('type') == 'manual'
+        for src in out['sources'] for x in (getattr(gq.node_data(store, src), 'metadata', None) or {}).get('source') or [])
     return out
 
 
@@ -880,7 +1025,7 @@ def node(qualified):
     package = _package_of(n)
     derived = []
     for subject, kind, obj, other in triples:
-        if kind == 'irds:derived_from' and obj == qualified:
+        if kind == 'irds:derivedFrom' and obj == qualified:
             o = gq.node_data(store, subject)
             derived.append({'name': subject, 'type': o.type if o else None})
     return render_template(
@@ -889,8 +1034,8 @@ def node(qualified):
         package=package,
         derived=derived,
         type_labels=TYPE_LABELS, sample_table=_pretty_samples(frozen, _record_fields(n) or ()),
-        snippet=_python_snippet(n), snippet_config=_snippet_config(n), record_fields=_record_fields(n), related=_related(n, triples),
-        resource_kind=_resource_kind(n) if v2.is_subtype(n.type, v2.DATA) else None)
+        snippet=_python_snippet(n), snippet_variants=_snippet_variants(n, triples), snippet_config=_snippet_config(n), record_fields=_record_fields(n), related=_related(n, triples),
+        resource_kind=_resource_kind(n) if v2.is_subclass(n.type, v2.DATA) else None)
 
 
 @app.after_request

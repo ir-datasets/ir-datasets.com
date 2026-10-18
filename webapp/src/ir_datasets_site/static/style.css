@@ -8,6 +8,15 @@ code {
   padding: 0;
 }
 
+/* Page-header breadcrumbs: ancestors gray and light, current page bold. */
+.crumbs a, .crumbs a code, .crumbs .sep { color: var(--tblr-secondary); font-weight: normal; }
+.crumbs code .text-secondary { color: inherit !important; }
+.crumbs .current, .crumbs .current code { color: var(--tblr-body-color); font-weight: bold; }
+
+/* The table-page Record box sits beside Overview from xl up: as wide as its
+   longest line (never wrapping), at least 16rem, at most half the row. */
+@media (min-width: 1200px) { .record-box { min-width: 16rem; max-width: 50%; } }
+
 [data-browse-sentinel] { height: 1px; }
 
 /* Regex-mode toggle for a search box (navbar, /provider/<prefix> -- both
@@ -358,3 +367,15 @@ h2 > .badge.badge-sm { top: -2px; }
   margin: 0 calc(-1 * var(--tblr-card-spacer-x, 1.25rem)) calc(-1 * var(--tblr-card-spacer-y, 1.25rem));
   border-top: 1px solid var(--tblr-border-color);
 }
+
+/* Compact pill buttons for choosing among alternatives (e.g. the Use It card's
+   Python API / CLI / ...); regular tabs are too tall for this. */
+.variant-pills { display: flex; flex-wrap: wrap; gap: .4rem; }
+.variant-pill {
+  font: inherit; font-size: .85rem; line-height: 1.2; cursor: pointer;
+  padding: .25rem .6rem; border-radius: .4rem;
+  color: var(--tblr-body-color, #1d273b); background: transparent;
+  border: 1px solid var(--tblr-border-color-translucent, rgba(0,0,0,.45));
+}
+.variant-pill:hover { background: var(--tblr-bg-surface-secondary, rgba(0,0,0,.05)); }
+.variant-pill.active { color: #fff; background: var(--tblr-primary, #4f86e8); border-color: var(--tblr-primary, #4f86e8); }

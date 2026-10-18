@@ -2,11 +2,11 @@
 {% import "_macros.html" as m %}
 {% block title %}{{ entry.name }} &mdash; ir-datasets.com{% endblock %}
 {% block content %}
-<h2 class="mb-3">
-  <span class="select">{{ node_code(entry.name) }}</span>
+<h2 class="mb-3 crumbs">
+  <a href="{{ url_for('classes') }}">Classes</a>{% for a in ancestors %} <span class="sep">&rsaquo;</span> <a href="{{ a.url }}">{{ node_code(a.name) }}</a>{% endfor %} <span class="sep">&rsaquo;</span>
+  <span class="select current">{{ node_code(entry.name) }}</span>
   <span class="badge badge-sm align-middle {{ entry.badge_class }}">{{ entry.label }}</span>
 </h2>
-<p class="text-secondary"><a href="{{ url_for('types') }}">All types</a>{% for a in ancestors %} &rsaquo; <a href="{{ a.url }}">{{ node_code(a.name) }}</a>{% endfor %} &rsaquo; {{ node_code(entry.name) }}</p>
 
 <div class="card mb-3">
   <div class="card-body">
@@ -25,7 +25,7 @@
 {% if protocol %}
 <div class="card mb-3">
   <div class="card-header"><h3 class="card-title">Protocol</h3>
-    <div class="card-actions text-secondary"><code>{{ protocol.ref }}</code>{% if protocol.inherited %} &middot; inherited from <a href="{{ url_for('type_page', qualified=protocol.declared_on) }}">{{ node_code(protocol.declared_on) }}</a>{% endif %}</div>
+    <div class="card-actions text-secondary"><code>{{ protocol.ref }}</code>{% if protocol.inherited %} &middot; inherited from <a href="{{ url_for('class_page', qualified=protocol.declared_on) }}">{{ node_code(protocol.declared_on) }}</a>{% endif %}</div>
   </div>
   <div class="card-body">
     <p class="text-secondary">Every node of this type satisfies <code>{{ protocol.name }}</code>: it has these members, and none are required beyond them{% if protocol.bases %} and those of the protocols it extends, shown below{% endif %}.</p>

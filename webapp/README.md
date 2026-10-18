@@ -105,15 +105,35 @@ identically to the live app.
 Every node records the pip **package** it comes from (`package`, the
 distribution that provides the defining module, else the provider's declared
 one) and may declare extra **packages** it needs beyond the core install
-(`requires-dependency` in the graph, by distribution name -- `trec-car-tools`,
-not an extra). Node pages show both in the **Use It** card's *Install* block: one
-copyable `pip install <package> <extra packages>` line; only when there are
-extra packages is there a warning-styled *Extra dependencies needed* alert
-naming them (linked to PyPI). The extra packages include those of everything the node
+(`irds:requiresDependency` in the graph, by distribution name -- `trec-car-tools`,
+not an extra). Node pages put one `pip install <package> <extra packages>`
+command in the **Use It** card's header actions; only when
+there are extra packages does the card also show a plain bordered note naming
+them (linked to PyPI). The extra packages include those of everything the node
 is built from (so a benchmark lists what its tables need):
 `graph_queries.effective_requires` computes that from the store by walking
 structural edges, and the live-fallback path uses `Graph.requires`. A suite has
 no Use It card, so its overview shows an *Extra packages* row instead.
+
+## Graph classes and graph properties
+
+The graph's vocabulary is declared by providers in `ir_datasets.v2`:
+**graph classes** (`irds.declare_graph_class(...)`: `irds:Docs`, `irds:Benchmark`)
+and **graph properties** (`irds.declare_graph_property(...)`), which are either
+edges between nodes (`irds:derivedFrom`) or literal-valued (`irds:description`,
+`irds:requiresDependency`), plus the standard `rdf:type` / `rdfs:subClassOf`.
+Everything is qualified by the provider that owns it, and every triple uses a
+declared graph property. `/classes` lists the classes as a tree with node counts
+and `/class/<name>` shows one with its nodes; `/properties` lists the properties
+grouped by owner (description, kind, structural, repeatable, triple count) and
+`/property/<name>` shows one with example triples. A node's *type* (`rdf:type`)
+is a graph class; type badges link to the class page, and the predicate cells in
+a node's Raw Triples link to the property page. JSON-valued properties are
+stored as `rdf:JSON` literals. As in RDF, any property can have several values on
+a node (`irds:column` and `irds:relevanceLabel` are one JSON document each);
+`graph_queries.node_data` keeps them all in `NodeView.values`, and pages show a
+list for citations, licenses, sources, hashes, columns and similar, and the first
+value (in a stable order) for the rest.
 
 ## What's here
 
@@ -121,7 +141,7 @@ no Use It card, so its overview shows an *Extra packages* row instead.
 |---|---|
 | `/` | Node-type counts, installed providers |
 | `/search?type=&q=` | Every node, filterable by type / name substring (live app only -- see "Static build" above) |
-| `/provider/<prefix>` | One provider's nodes, declared vocabulary, aliases |
+| `/provider/<prefix>` | One provider's nodes, declared classes and properties, aliases |
 | `/n/<qualified>` | One node — dispatches to a type-specific template (`node_benchmark.html`, `node_table.html`, `node_resource.html`, `node_suite.html`), falling back to `node_generic.html` for a type this site has no template for yet (a third-party provider's own vocabulary, once those exist) |
 
 ## Known limitations (honest, not hidden)
