@@ -20,6 +20,7 @@
         <div class="acq-title">Overview</div>
         <div class="acq-rows">
 {{ m.type_row(node) }}
+{{ m.bundles_row(related) }}
           <div class="acq-row"><span class="acq-label">Entity</span><code>{{ node.entity }}</code></div>
           {% if node.metadata.lang %}<div class="acq-row"><span class="acq-label">Language</span><span>{{ m.language_link(node.metadata.lang) }}</span></div>{% endif %}
           {% set count = frozen_count(node) %}

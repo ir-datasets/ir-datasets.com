@@ -18,7 +18,7 @@ happens once, ahead of time, instead of on every request:
 Hub datasets, fully dynamic -- see `ir_datasets.v2.hf_provider`) are both
 materialized; `hf`'s data is necessarily a point-in-time snapshot, since it can't be
 enumerated ahead of time. A node the last snapshot missed
-(a brand-new hf repo) still resolves -- `/n/<qualified>` falls back to a live
+(a brand-new hf repo) still resolves -- `/id/<qualified>` falls back to a live
 `ir_datasets.v2` lookup for anything not in the store.
 
 ## Run it
@@ -123,9 +123,9 @@ edges between nodes (`irds:derivedFrom`) or literal-valued (`irds:description`,
 `irds:requiresDependency`), plus the standard `rdf:type` / `rdfs:subClassOf`.
 Everything is qualified by the provider that owns it, and every triple uses a
 declared graph property. `/classes` lists the classes as a tree with node counts
-and `/class/<name>` shows one with its nodes; `/properties` lists the properties
+and `/id/<class>` shows one with its nodes; `/properties` lists the properties
 grouped by owner (description, kind, structural, repeatable, triple count) and
-`/property/<name>` shows one with example triples. A node's *type* (`rdf:type`)
+`/id/<property>` shows one with example triples. A node's *type* (`rdf:type`)
 is a graph class; type badges link to the class page, and the predicate cells in
 a node's Raw Triples link to the property page. JSON-valued properties are
 stored as `rdf:JSON` literals. As in RDF, any property can have several values on
@@ -141,7 +141,9 @@ value (in a stable order) for the rest.
 | `/` | Node-type counts, installed providers |
 | `/search?type=&q=` | Every node, filterable by type / name substring (live app only -- see "Static build" above) |
 | `/provider/<prefix>` | One provider's nodes, declared classes and properties, aliases |
-| `/n/<qualified>` | One node — dispatches to a type-specific template (`node_benchmark.html`, `node_table.html`, `node_resource.html`, `node_suite.html`), falling back to `node_generic.html` for a type this site has no template for yet (a third-party provider's own vocabulary, once those exist) |
+| `/id/<name>` | The canonical address of a node, a graph class or a graph property (the same IRI the store uses, `http://ir-datasets.com/id/<name>`), with a `rel=canonical` link. A node's page dispatches to a type-specific template (`node_benchmark.html`, `node_table.html`, `node_resource.html`, `node_suite.html`), falling back to `node_generic.html` for a type this site has no template for yet (a third-party provider's own vocabulary, once those exist) |
+| `/legacy/<v1 id>` | A v1 dataset id's current page (a 301 to `/id/<node>`), via the `legacy:` provider's `aliasOf` edges. An id that was never replaced falls back to its nearest replaced ancestor, then to its family's main dataset |
+| `/<family>.html` | The old per-family pages. The old site kept each dataset in the URL fragment (`antique.html#antique/test`), which a server never sees, so this serves a tiny page of script that reads the fragment and goes to `/legacy/<id>`. `/index.html` goes to `/`, `/datasets.html` and `/all.html` to `/search` |
 
 ## Known limitations (honest, not hidden)
 

@@ -118,14 +118,14 @@ def build(out='dist', providers=None):
 
     * ``/`` -- the home page, via ``render_to_static_page`` (a plain, already
       static-safe Flask route -- no live-only feature involved).
-    * ``/n/<qualified>`` for every node in ``providers`` -- same mechanism.
+    * ``/id/<name>`` for every node in ``providers`` -- same mechanism.
     * ``/search`` and ``/search/type/<type>`` -- one pre-rendered listing per
       type filter (plus "all types"), rows inlined via search.html's static
       branch (rendered directly, not through the live ``/search`` route,
       since that route always passes ``rows=None`` -- see app.py's
       ``search()``).
-    * ``/classes`` and ``/class/<qualified>`` for every known graph class, and
-      ``/properties`` and ``/property/<qualified>`` for every declared graph property.
+    * ``/classes`` and ``/id/<class>`` for every known graph class, and
+      ``/properties`` and ``/id/<property>`` for every declared graph property.
     * ``/provider/<prefix>`` for every provider in ``providers`` -- same
       inlined-rows approach, via provider.html's static branch.
     * ``static/`` -- copied as-is (CSS; ``browse.js``/``nav.js`` are left out
@@ -182,7 +182,7 @@ def build(out='dist', providers=None):
     with app.test_request_context():
         names = [name for name, _type in gq.list_nodes(store, providers=selected, limit=None)[0]]
         # _node_url (-> url_for) percent-encodes whatever needs it (a
-        # literal space, '%', '+', ...) -- a raw f'/n/{name}' doesn't, so a
+        # literal space, '%', '+', ...) -- a raw f'/id/{name}' doesn't, so a
         # name containing any of those wouldn't round-trip back to the same
         # string once a URL parser (Werkzeug's routing here, a browser's
         # address bar later) decodes it again. Built up front, in this one
@@ -194,8 +194,8 @@ def build(out='dist', providers=None):
     with app.test_request_context():
         # The overview and one page per known graph class and graph property (see app.py's
         # classes()/class_page() and properties()/property_page()).
-        type_urls = ['/classes'] + [url_for('class_page', qualified=t) for t in sorted(_type_graph()[0])]
-        type_urls += ['/properties'] + [url_for('property_page', qualified=q) for q in sorted(v2.graph_properties())]
+        type_urls = ['/classes'] + [_node_url(t) for t in sorted(_type_graph()[0])]
+        type_urls += ['/properties'] + [_node_url(q) for q in sorted(v2.graph_properties())]
 
     with app.test_client() as client:
         for name, url in tqdm(node_urls, desc='node pages', unit='page'):

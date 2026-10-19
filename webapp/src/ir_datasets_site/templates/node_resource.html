@@ -22,6 +22,7 @@
         <div class="acq-title">Overview</div>
         <div class="acq-rows">
 {{ m.type_row(node) }}
+{{ m.bundles_row(related) }}
           <div class="acq-row"><span class="acq-label">Kind</span><span>{{ {'file': 'File', 'directory': 'Directory', 'git': 'Git repository'}[resource_kind] }}</span></div>
           {% if node.metadata.fileSize %}<div class="acq-row"><span class="acq-label">Size</span><span>{{ node.metadata.fileSize | human_size }}</span></div>{% endif %}
 {{ m.citation_row(node) }}

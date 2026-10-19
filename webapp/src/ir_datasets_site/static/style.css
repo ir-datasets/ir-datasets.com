@@ -379,3 +379,16 @@ h2 > .badge.badge-sm { top: -2px; }
 }
 .variant-pill:hover { background: var(--tblr-bg-surface-secondary, rgba(0,0,0,.05)); }
 .variant-pill.active { color: #fff; background: var(--tblr-primary, #4f86e8); border-color: var(--tblr-primary, #4f86e8); }
+
+/* A node's Markdown summary: tables and lists read like the rest of the page. */
+.markdown table { border-collapse: separate; border-spacing: 0; margin: 0 0 1rem;
+  border: 1px solid var(--tblr-border-color, #dadfe5); border-radius: .35rem; overflow: hidden; }
+.markdown table th, .markdown table td { padding: .5rem .9rem !important;
+  border-bottom: 1px solid var(--tblr-border-color, #dadfe5); }
+.markdown th + th, .markdown td + td { border-left: 1px solid var(--tblr-border-color, #dadfe5); }
+.markdown tbody tr:last-child td { border-bottom: 0; }
+.markdown th { background: var(--tblr-bg-surface-secondary, rgba(0,0,0,.04)); text-align: left; }
+.markdown h2 { font-size: 1.15rem; margin: 1.25rem 0 .5rem; }
+.markdown > :last-child { margin-bottom: 0; }
+.markdown td code { white-space: nowrap; }
+.markdown thead th { border-bottom: 1px solid var(--tblr-border-color, #dadfe5) !important; }

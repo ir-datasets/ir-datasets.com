@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1/dist/libs/tom-select/dist/css/tom-select.bootstrap5.min.css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  {% if canonical_url %}<link rel="canonical" href="{{ canonical_url }}">{% endif %}
 </head>
 <body>
 <div class="page">

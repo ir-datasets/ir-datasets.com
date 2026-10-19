@@ -27,9 +27,9 @@
     <tbody>
     {% for subject, object, kind in rows %}
     <tr>
-      <td class="text-nowrap">{% if kind == 'type' and entry.name == 'rdfs:subClassOf' %}<a href="{{ url_for('class_page', qualified=subject) }}"><code>{{ subject }}</code></a>{% else %}<a href="{{ node_url(subject) }}">{{ node_code(subject) }}</a>{% endif %}</td>
+      <td class="text-nowrap">{% if kind == 'type' and entry.name == 'rdfs:subClassOf' %}<a href="{{ node_url(subject) }}"><code>{{ subject }}</code></a>{% else %}<a href="{{ node_url(subject) }}">{{ node_code(subject) }}</a>{% endif %}</td>
       <td class="text-nowrap"><code class="text-success">{{ entry.name }}</code></td>
-      <td>{% if kind == 'node' %}<a href="{{ node_url(object) }}">{{ node_code(object) }}</a>{% elif kind == 'type' %}<a href="{{ url_for('class_page', qualified=object) }}"><code>{{ object }}</code></a>{% else %}<code class="text-break">{{ object }}</code>{% endif %}</td>
+      <td>{% if kind == 'node' %}<a href="{{ node_url(object) }}">{{ node_code(object) }}</a>{% elif kind == 'type' %}<a href="{{ node_url(object) }}"><code>{{ object }}</code></a>{% else %}<code class="text-break">{{ object }}</code>{% endif %}</td>
     </tr>
     {% endfor %}
     </tbody>

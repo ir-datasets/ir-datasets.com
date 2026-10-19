@@ -12,7 +12,8 @@ import json
 import re
 
 from .rdf_schema import (
-    FROZEN_FIELDS, RDF_JSON, RDF_TYPE, RDFS_SUBCLASS_OF, edge_iri, edge_kind, graph_name,
+    FROZEN_FIELDS, RDF_JSON, RDF_PROPERTY, RDF_TYPE, RDFS_COMMENT, RDFS_RANGE, RDFS_SUBCLASS_OF,
+    RDFS_SUBPROPERTY_OF, edge_iri, edge_kind, graph_name,
     graph_iri, meta_field, meta_iri, node_iri, node_name, type_iri, type_name,
 )
 
@@ -163,6 +164,12 @@ def property_term(qualified, range):
         return RDF_TYPE
     if qualified == 'rdfs:subClassOf':
         return RDFS_SUBCLASS_OF
+    if qualified == 'rdfs:range':
+        return RDFS_RANGE
+    if qualified == 'rdfs:comment':
+        return RDFS_COMMENT
+    if qualified == 'rdfs:subPropertyOf':
+        return RDFS_SUBPROPERTY_OF
     return edge_iri(qualified) if range == 'node' else meta_iri(qualified)
 
 
@@ -176,9 +183,13 @@ def property_counts(store, declared, providers=None):
         term = property_term(qualified, entry['range'])
         if graphs is None:
             counts[qualified] = sum(1 for _ in store.quads_for_pattern(None, term, None))
+            defined = sum(1 for _ in store.quads_for_pattern(None, term, RDF_PROPERTY)) if term == RDF_TYPE else 0
         else:
             counts[qualified] = sum(1 for g in graphs
                                     for _ in store.quads_for_pattern(None, term, None, g))
+            defined = sum(1 for g in graphs for _ in store.quads_for_pattern(None, term, RDF_PROPERTY, g)
+                          ) if term == RDF_TYPE else 0
+        counts[qualified] -= defined          # a property describing itself is not a use of rdf:type
     return counts
 
 
@@ -195,6 +206,8 @@ def property_examples(store, qualified, range, providers=None, limit=50):
             subject = node_name(quad.subject)
             if subject is None:                      # a type's own subClassOf row
                 subject = type_name(quad.subject)
+            if subject is None:                      # a graph property's own description
+                continue
             if quad.predicate == RDF_TYPE or quad.predicate == RDFS_SUBCLASS_OF:
                 rows.append((subject, type_name(quad.object), 'type'))
             elif range == 'node':
@@ -307,6 +320,8 @@ def _all_type_rows(store):
         # several): (name, sorted tuple of types, provider).
         grouped = {}
         for q in store.quads_for_pattern(None, RDF_TYPE, None, None):
+            if node_name(q.subject) is None:         # a graph property describing itself, not a node
+                continue
             key = (node_name(q.subject), graph_name(q.graph_name))
             grouped.setdefault(key, set()).add(type_name(q.object))
         _type_rows_cache = sorted(

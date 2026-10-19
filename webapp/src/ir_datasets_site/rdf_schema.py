@@ -48,6 +48,17 @@ GRAPH = 'http://ir-datasets.com/provider/'
 
 RDF_TYPE = ox.NamedNode('http://www.w3.org/1999/02/22-rdf-syntax-ns#type')
 RDFS_SUBCLASS_OF = ox.NamedNode('http://www.w3.org/2000/01/rdf-schema#subClassOf')
+RDF_PROPERTY = ox.NamedNode('http://www.w3.org/1999/02/22-rdf-syntax-ns#Property')
+RDFS_RANGE = ox.NamedNode('http://www.w3.org/2000/01/rdf-schema#range')
+RDFS_COMMENT = ox.NamedNode('http://www.w3.org/2000/01/rdf-schema#comment')
+RDFS_SUBPROPERTY_OF = ox.NamedNode('http://www.w3.org/2000/01/rdf-schema#subPropertyOf')
+#: A graph property's ``rdfs:range`` term -> the standard IRI for it.
+RANGE_IRIS = {
+    'rdfs:Resource': ox.NamedNode('http://www.w3.org/2000/01/rdf-schema#Resource'),
+    'rdfs:Literal': ox.NamedNode('http://www.w3.org/2000/01/rdf-schema#Literal'),
+    'rdfs:Class': ox.NamedNode('http://www.w3.org/2000/01/rdf-schema#Class'),
+    'rdf:JSON': ox.NamedNode('http://www.w3.org/1999/02/22-rdf-syntax-ns#JSON'),
+}
 XSD_INTEGER = ox.NamedNode('http://www.w3.org/2001/XMLSchema#integer')
 #: A literal that holds a JSON document (a ``json``-range property).
 RDF_JSON = ox.NamedNode('http://www.w3.org/1999/02/22-rdf-syntax-ns#JSON')
@@ -110,6 +121,15 @@ def meta_field(iri):
     return _unescape(value[len(META):]) if value.startswith(META) else None
 
 
+def property_iri(qualified):
+    """The IRI a graph property is *known by* -- the same one it is used as a predicate under, so
+    a description of it (``rdf:type rdf:Property``, its range, its comment) is about the very
+    thing that appears in the data: an edge under EDGE, a literal property under META."""
+    from ir_datasets.v2.vocabulary import graph_properties
+    entry = graph_properties().get(qualified)
+    return edge_iri(qualified) if entry and entry['range'] == 'node' else meta_iri(qualified)
+
+
 def graph_iri(name):
     return ox.NamedNode(GRAPH + _escape(name))
 
@@ -153,7 +173,15 @@ def to_quads(triples):
         try:
             s = node_iri(subject)
             g = graph_iri(graph_for(subject))
-            if predicate == 'rdf:type':
+            if predicate == 'rdf:type' and obj == 'rdf:Property':
+                yield ox.Quad(property_iri(subject), RDF_TYPE, RDF_PROPERTY, g)
+            elif predicate == 'rdfs:range':
+                yield ox.Quad(property_iri(subject), RDFS_RANGE, RANGE_IRIS[obj], g)
+            elif predicate == 'rdfs:subPropertyOf':
+                yield ox.Quad(property_iri(subject), RDFS_SUBPROPERTY_OF, property_iri(obj), g)
+            elif predicate == 'rdfs:comment':
+                yield ox.Quad(property_iri(subject), RDFS_COMMENT, ox.Literal(str(obj.value)), g)
+            elif predicate == 'rdf:type':
                 yield ox.Quad(s, RDF_TYPE, type_iri(obj), g)
             elif predicate == 'rdfs:subClassOf':
                 yield ox.Quad(type_iri(subject), RDFS_SUBCLASS_OF, type_iri(obj), g)

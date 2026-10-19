@@ -9,10 +9,10 @@
     <div class="row">
       <div class="col-6 col-md-3"><div class="text-secondary">Package</div><div>{{ provider.package or '&mdash;' }}</div></div>
       <div class="col-6 col-md-3"><div class="text-secondary">Graph classes declared</div><div>
-        {% for t in manifest.classes.keys()|sort %}<a href="{{ url_for('class_page', qualified=t) }}"><code>{{ t }}</code></a>{% if not loop.last %}, {% endif %}{% endfor %}
+        {% for t in manifest.classes.keys()|sort %}<a href="{{ node_url(t) }}"><code>{{ t }}</code></a>{% if not loop.last %}, {% endif %}{% endfor %}
       </div></div>
       <div class="col-6 col-md-3"><div class="text-secondary">Graph properties declared</div><div>
-        {% for k, info in manifest.properties.items()|sort %}<a href="{{ url_for('property_page', qualified=k) }}"><code>{{ k }}</code></a>{{ ' (structural)' if info.structural else '' }}{% if not loop.last %}, {% endif %}{% endfor %}
+        {% for k, info in manifest.properties.items()|sort %}<a href="{{ node_url(k) }}"><code>{{ k }}</code></a>{{ ' (structural)' if info.structural else '' }}{% if not loop.last %}, {% endif %}{% endfor %}
       </div></div>
     </div>
   </div>

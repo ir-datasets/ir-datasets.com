@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>Moved &ndash; ir_datasets</title>
+<noscript><meta http-equiv="refresh" content="0; url={{ url_for('legacy_id', v1_id=family) }}" /></noscript>
+</head>
+<body>
+<p>This page has moved to <a href="{{ url_for('legacy_id', v1_id=family) }}">{{ family }}</a>.</p>
+<script>
+(function () {
+  // The old pages kept each dataset in the fragment (#antique/test, or #antique/test__queries).
+  var id = decodeURIComponent(location.hash.slice(1)).replace(/__.*$/, '') || {{ family|tojson }};
+  location.replace('/legacy/' + id.split('/').map(encodeURIComponent).join('/'));
+})();
+</script>
+</body>
+</html>

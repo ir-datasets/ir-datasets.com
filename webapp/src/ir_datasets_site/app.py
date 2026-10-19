@@ -27,7 +27,7 @@ from pathlib import Path
 
 import pyoxigraph as ox
 from markupsafe import Markup, escape
-from flask import Flask, abort, jsonify, render_template, request, send_file, url_for
+from flask import Flask, abort, jsonify, redirect, render_template, request, send_file, url_for
 
 from . import graph_queries as gq
 from ir_datasets.v2 import requirements as v2_requirements
@@ -67,6 +67,18 @@ gq.warm(store)
 #: (see its ``default_dump_path``) -- served from here by ``graph_dump()``,
 #: and copied as-is into a static build's output by static_site.py.
 DUMP_PATH = STORE_PATH.with_suffix('.nq.gz')
+
+
+#: The site's public address, for a page's canonical link.
+CANONICAL_BASE = os.environ.get('IR_DATASETS_SITE_BASE_URL', 'https://ir-datasets.com').rstrip('/')
+
+
+@app.context_processor
+def _canonical_link():
+    """``canonical_url`` on an entity page: its ``/id/<name>`` address, absolute."""
+    if request.endpoint == 'entity':
+        return {'canonical_url': CANONICAL_BASE + request.path}
+    return {}
 
 
 @app.context_processor
@@ -121,6 +133,7 @@ TEMPLATE_BY_TYPE = {
     v2.TABLE: 'node_table.html',
     v2.BENCHMARK: 'node_benchmark.html',
     v2.SUITE: 'node_suite.html',
+    v2.BUNDLE: 'node_bundle.html',
 }
 
 #: Exact-type template overrides, checked before the category-based
@@ -595,7 +608,7 @@ def _resource_snippet(node):
 def _node_url(name):
     """A link to a node by qualified name -- resolvable whether or not it's
     in the materialized store (the route falls back to a live resolution)."""
-    return url_for('node', qualified=name)
+    return url_for('entity', name=name)
 
 
 def _type_label(t):
@@ -868,7 +881,7 @@ def _type_graph():
 def _type_entry(t, parents, children, counts):
     return {'name': t, 'label': _type_label(t), 'badge_class': _type_badge_class(t),
             'desc': _type_description(t), 'count': counts.get(t, 0),
-            'url': url_for('class_page', qualified=t),
+            'url': _node_url(t),
             'children': [_type_entry(c, parents, children, counts) for c in children.get(t, [])]}
 
 
@@ -889,7 +902,7 @@ def _property_entries():
     counts = gq.property_counts(store, declared, providers=_selected_providers())
     return [{'name': q, 'owner': e['owner'], 'local': q.split(':', 1)[1], 'range': e['range'],
              'structural': e['structural'], 'desc': e['desc'],
-             'count': counts.get(q, 0), 'url': url_for('property_page', qualified=q)}
+             'count': counts.get(q, 0), 'url': _node_url(q)}
             for q, e in sorted(declared.items())]
 
 
@@ -908,7 +921,6 @@ def properties():
 PROPERTY_PAGE_ROWS = 50
 
 
-@app.route('/property/<path:qualified>')
 def property_page(qualified):
     entries = {e['name']: e for e in _property_entries()}
     entry = entries.get(qualified)
@@ -958,7 +970,6 @@ def _protocol_info(t):
 TYPE_PAGE_ROWS = 100
 
 
-@app.route('/class/<path:qualified>')
 def class_page(qualified):
     parents, children, counts = _type_graph()
     if qualified not in parents:
@@ -972,7 +983,7 @@ def class_page(qualified):
     return render_template(
         'class.html', entry=_type_entry(qualified, parents, children, counts),
         protocol=_protocol_info(qualified),
-        ancestors=[{'name': a, 'label': _type_label(a), 'url': url_for('class_page', qualified=a)}
+        ancestors=[{'name': a, 'label': _type_label(a), 'url': _node_url(a)}
                    for a in reversed(ancestors)],
         rows=[_row_dict(name, ts) for name, ts in rows], total=total, shown=len(rows))
 
@@ -1016,13 +1027,41 @@ def _alt_note(name):
     return view.metadata.get('alternativeNote') if view is not None else None
 
 
+def _is_overview(name):
+    view = gq.node_data(store, name)
+    return view is not None and v2.is_subclass(view.type, v2.OVERVIEW)
+
+
+def _overviews_of(name, limit=300):
+    """The Overviews that describe ``name``: any Overview that contains it, directly (a
+    ``hasPart`` edge) or through what it is part of -- a table is described by the overview
+    of a benchmark that uses it, a file by that of the table parsed from it. Found by walking
+    structural edges *up* from the node, stopping at the first Overview on each path, so
+    a bundle need list only its main parts, not every table beneath them."""
+    structural = set(v2.STRUCTURAL_EDGES)
+    found, seen, frontier = [], {name}, [name]
+    while frontier and len(seen) < limit:
+        nxt = []
+        for current in frontier:
+            for subject, kind, obj, _other in gq.triples_of(store, current):
+                if obj != current or kind not in structural or subject in seen:
+                    continue
+                seen.add(subject)
+                if _is_overview(subject):
+                    found.append(subject)
+                else:
+                    nxt.append(subject)
+        frontier = nxt
+    return sorted(found)
+
+
 def _related(n, triples):
     """What a node's page links to, all read off its own edges. For a Table:
     the Resource(s) it's parsed from, any Table it's derived from (plus what
     filters it), and the Benchmarks that use it. For a Benchmark: the Suites
     it belongs to. For a Suite: its member Benchmarks and nested Suites."""
     name = n.qualified_name
-    out = {'sources': [], 'derived_from': [], 'filtered_by': [], 'used_by': [],
+    out = {'parts': [], 'bundles': [], 'overviews': [], 'sources': [], 'derived_from': [], 'filtered_by': [], 'used_by': [],
            'suites': [], 'member_benchmarks': [], 'member_suites': [], 'members': [],
            'alternatives': [], 'alternative_of': [], 'alternative_note': None,
            'facet_alternatives': {}}
@@ -1049,6 +1088,10 @@ def _related(n, triples):
             out['filtered_by'].append(obj)
         elif obj == name and kind in facet_kinds:
             out['used_by'].append((subject, kind.split(':', 1)[1]))
+        elif subject == name and kind == 'irds:hasPart':
+            out['parts'].append(obj)
+        elif obj == name and kind == 'irds:hasPart':
+            out['bundles'].append(subject)
         elif obj == name and kind == 'irds:member':
             out['suites'].append(subject)
         elif subject == name and kind == 'irds:member':
@@ -1056,6 +1099,10 @@ def _related(n, triples):
             is_suite = target is not None and v2.is_subclass(target.type, v2.SUITE)
             out['member_suites' if is_suite else 'member_benchmarks'].append(obj)
             out['members'].append({'name': obj, 'type': target.type if target else None})
+    out['overviews'] = _overviews_of(name)
+    # Bundles that are not an overview themselves (those are listed above, by the overview row).
+    out['bundles'] = [b for b in out['bundles'] if b not in out['overviews']
+                      and not _is_overview(b)]
     # A table's sources are auto-downloadable unless any needs a manual download.
     out['sources_manual'] = any(
         x.get('type') == 'manual'
@@ -1063,7 +1110,169 @@ def _related(n, triples):
     return out
 
 
-@app.route('/n/<path:qualified>')
+#: What a bundle's parts are called when counted, by kind (the first that fits wins).
+_BUNDLE_KINDS = (
+    (v2.BENCHMARK, 'benchmark'), (v2.SUITE, 'suite'), (v2.BUNDLE, 'bundle'),
+    ('irds:Docs', 'document set'), ('irds:Queries', 'query set'), ('irds:Qrels', 'qrels'),
+)
+
+
+def _bundle_overview(parts):
+    """What a bundle page derives from its parts rather than has written: one entry per part
+    (name, type, and the facts shown after it -- its description, and for a table its language
+    and size), the language/license/citation across them, and a count by kind. Nothing here is
+    authored. Entries are ordered by name, so related parts (a corpus and its splits, which
+    share a prefix) sit together."""
+    entries, counts = [], {}
+    languages, licenses, citations = [], [], []
+
+    def note(into, values):
+        for v in values if isinstance(values, (list, tuple)) else [values]:
+            if v and v not in into:
+                into.append(v)
+
+    for name in sorted(parts):
+        view = gq.node_data(store, name)
+        if view is None:
+            entries.append({'name': name, 'type': None, 'description': None, 'lang': [], 'count': None})
+            continue
+        entry = {'name': name, 'type': view.type,
+                 'description': view.metadata.get('description'),
+                 'lang': view.values.get('lang') or [],
+                 'count': _frozen_of(view).get('count')}
+        entries.append(entry)
+        note(languages, entry['lang'])
+        note(licenses, view.values.get('license') or [])
+        note(citations, view.values.get('citation') or [])
+        kind = next((label for category, label in _BUNDLE_KINDS if v2.is_subclass(view.type, category)),
+                    'other')
+        counts[kind] = counts.get(kind, 0) + 1
+    return {'entries': entries, 'counts': list(counts.items()), 'languages': languages,
+            'licenses': licenses, 'citations': citations, 'count': len(parts)}
+
+
+_ALLOWED_HREF = re.compile(r'^(https?://|mailto:|/|#)', re.I)
+#: ``[[node]]`` or ``[[node|label]]`` in a summary: a link to a node.
+_NODE_REF = re.compile(r'\[\[([^\[\]|]+?)(?:\|([^\[\]]+?))?\]\]')
+
+
+def _resolve_ref(ref, bundle_name):
+    """The qualified node a ``[[ref]]`` in ``bundle_name``'s summary means, or ``None``. A
+    qualified name (``irds:msmarco-passage``) is itself; a bare one is a sibling fragment of the
+    bundle (``par-par-test`` in ``hf:owner/repo`` is ``hf:owner/repo/par-par-test``), else a
+    node in the bundle's own provider (``msmarco-passage`` in ``irds:msmarco``)."""
+    ref = ref.strip()
+    candidates = [ref] if ':' in ref else []
+    if ':' not in ref and bundle_name:
+        candidates.append(f'{bundle_name}/{ref}')
+        candidates.append(f'{bundle_name.split(":", 1)[0]}:{ref}')
+    return next((c for c in candidates if _node_exists(c)), None)
+
+
+def _link_node_refs(text, bundle_name):
+    """Turn ``[[node]]`` references into Markdown links (code-styled), or plain code when
+    the node doesn't exist, so a stale reference is visible and not a dead link."""
+    def link(match):
+        ref, label = match.group(1).strip(), (match.group(2) or '').strip()
+        target = _resolve_ref(ref, bundle_name)
+        shown = label or f'`{ref}`'
+        return f'[{shown}]({_node_url(target)})' if target else (label or f'`{ref}`')
+    return _NODE_REF.sub(link, text)
+
+
+@app.template_filter('markdown')
+def markdown_filter(text, node=None):
+    """Render a node's hand-written summary. ``[[node]]`` / ``[[node|label]]`` become links to
+    nodes (resolved relative to ``node``, the bundle the summary belongs to). Raw HTML in the
+    source is escaped, and a link is kept only if it is http(s), mailto, or a local path."""
+    import markdown
+    source = _link_node_refs(str(text or ''), getattr(node, 'qualified_name', None))
+    html = markdown.markdown(source.replace('<', '&lt;'),
+                             extensions=['tables', 'sane_lists', 'fenced_code'])
+    html = re.sub(r'href="([^"]*)"',
+                  lambda m: m.group(0) if _ALLOWED_HREF.match(m.group(1)) else 'href="#"', html)
+    return Markup(html)
+
+
+@app.route('/id/<path:name>')
+def entity(name):
+    """The page for anything identified here -- ``http://ir-datasets.com/id/<name>`` is the
+    canonical URL of a node, a declared graph property or a graph class, and serves its page
+    directly: a declared graph property's, else a graph class's, else the node's (which
+    resolves it live if the snapshot lacks it, or is a 404)."""
+    if any(e['name'] == name for e in _property_entries()):
+        return property_page(name)
+    if name in _type_graph()[0]:
+        return class_page(name)
+    return node(name)
+
+
+# ── ir_datasets v1 addresses ─────────────────────────────────────────────────────────
+# The previous site was one static page per dataset family, with each dataset a URL *fragment*
+# on it (``antique.html#antique/test``). A fragment never reaches a server, so the page itself
+# is a tiny script that reads it and goes to ``/legacy/<v1 id>``; that is a real server-side
+# redirect (``legacy:<id>`` aliases the node that replaced it).
+
+def _legacy_alias(v1_id):
+    """The node that replaced the v1 dataset id ``v1_id``, or ``None`` (no such id, or not replaced)."""
+    name = f'legacy:{v1_id}'
+    if not gq.node_exists(store, name):
+        return None
+    return next((obj for subject, kind, obj, _other in gq.triples_of(store, name)
+                 if subject == name and kind == 'irds:aliasOf'), None)
+
+
+_family_main_cache = {}
+
+
+def _legacy_family_main(family):
+    """The node a v1 family (``antique``, ``msmarco-passage``) stands at: that of its first
+    replaced id, in id order -- where a family's own page lands when no dataset is named, or
+    when the named id was never replaced. ``None`` if nothing in the family was."""
+    if family not in _family_main_cache:
+        from .rdf_schema import edge_iri, graph_iri, node_name
+        best = None
+        for quad in store.quads_for_pattern(None, edge_iri('irds:aliasOf'), None, graph_iri('legacy')):
+            v1_id = (node_name(quad.subject) or '')[len('legacy:'):]
+            if (v1_id == family or v1_id.startswith(family + '/')) and (best is None or v1_id < best[0]):
+                best = (v1_id, node_name(quad.object))
+        _family_main_cache[family] = best[1] if best else None
+    return _family_main_cache[family]
+
+
+@app.route('/legacy/<path:v1_id>')
+def legacy_id(v1_id):
+    """A v1 dataset id's current page, as a permanent redirect. An id that was never replaced
+    (or one this site has never heard of, under a known family) falls back to its nearest
+    replaced ancestor, then to its family's main dataset."""
+    parts = v1_id.split('/')
+    target = next((t for t in (_legacy_alias('/'.join(parts[:n])) for n in range(len(parts), 0, -1)) if t),
+                  None) or _legacy_family_main(parts[0])
+    if target is None:
+        abort(404, f'{v1_id!r} is not a dataset id this site knows')
+    return redirect(url_for('entity', name=target), code=301)
+
+
+@app.route('/<family>.html')
+def legacy_page(family):
+    """An old family page (``/antique.html``). The dataset is in the URL's fragment, which only
+    the browser sees, so this is a page of script that sends it on to ``/legacy/<id>``."""
+    if _legacy_family_main(family) is None and not gq.node_exists(store, f'legacy:{family}'):
+        abort(404, f'{family}.html is not a page this site has')
+    return render_template('legacy_page.html', family=family)
+
+
+@app.route('/index.html')
+def legacy_index():
+    return redirect(url_for('index'), code=301)
+
+
+@app.route('/datasets.html')
+@app.route('/all.html')
+def legacy_catalog():
+    return redirect(url_for('search'), code=301)
+
+
 def node(qualified):
     try:
         n = gq.node_data(store, qualified)
@@ -1096,13 +1305,14 @@ def node(qualified):
         if kind == 'irds:derivedFrom' and obj == qualified:
             o = gq.node_data(store, subject)
             derived.append({'name': subject, 'type': o.type if o else None})
+    related = _related(n, triples)
     return render_template(
         template, node=n, frozen=frozen, triples=triples, raw_triples=raw_triples,
         requires=requires, install_hint=v2_requirements.install_hint(requires) if requires else None,
         package=package,
         derived=derived,
         type_labels=TYPE_LABELS, sample_table=_pretty_samples(frozen, _record_fields(n) or ()),
-        snippet=_python_snippet(n), snippet_variants=_snippet_variants(n, triples), snippet_config=_snippet_config(n), record_fields=_record_fields(n), related=_related(n, triples),
+        snippet=_python_snippet(n), snippet_variants=_snippet_variants(n, triples), snippet_config=_snippet_config(n), record_fields=_record_fields(n), related=related, bundle=_bundle_overview(related['parts']) if category == v2.BUNDLE else None,
         resource_kind=_resource_kind(n) if v2.is_subclass(n.type, v2.DATA) else None)
 
 

@@ -44,8 +44,8 @@
   {% for subject, predicate, object, kind, graph in raw_triples %}
   <tr>
     <td class="text-nowrap">{% if subject == self_name %}<code class="text-success">{{ subject }}</code>{% else %}<a href="{{ node_url(subject) }}">{{ node_code(subject) }}</a>{% endif %}</td>
-    <td class="text-nowrap"><a href="{{ url_for('property_page', qualified=predicate) }}"><code>{{ predicate }}</code></a></td>
-    <td>{% if kind == 'node' %}{% if object == self_name %}<code class="text-success">{{ object }}</code>{% else %}<a href="{{ node_url(object) }}">{{ node_code(object) }}</a>{% endif %}{% elif kind == 'type' %}<a href="{{ url_for('class_page', qualified=object) }}"><code>{{ object }}</code></a>{% else %}<code class="text-break">{{ object }}</code>{% endif %}</td>
+    <td class="text-nowrap"><a href="{{ node_url(predicate) }}"><code>{{ predicate }}</code></a></td>
+    <td>{% if kind == 'node' %}{% if object == self_name %}<code class="text-success">{{ object }}</code>{% else %}<a href="{{ node_url(object) }}">{{ node_code(object) }}</a>{% endif %}{% elif kind == 'type' %}<a href="{{ node_url(object) }}"><code>{{ object }}</code></a>{% else %}<code class="text-break">{{ object }}</code>{% endif %}</td>
     <td class="text-nowrap"><code>{{ graph }}</code></td>
   </tr>
   {% endfor %}
@@ -193,9 +193,19 @@
       </div>
 {% endmacro %}
 
+{# The overview(s) that describe a node, and any plain bundles it is directly part of. #}
+{% macro bundles_row(related) %}
+{% if related.overviews %}
+          <div class="acq-row"><span class="acq-label">Overview</span><span>{% for b in related.overviews %}<a href="{{ node_url(b) }}">{{ node_code(b) }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</span></div>
+{% endif %}
+{% if related.bundles %}
+          <div class="acq-row"><span class="acq-label">Part of</span><span>{% for b in related.bundles %}<a href="{{ node_url(b) }}">{{ node_code(b) }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</span></div>
+{% endif %}
+{% endmacro %}
+
 {# First row of the Overview box: the node's type, as its badge. #}
 {% macro type_row(node) %}
-          <div class="acq-row"><span class="acq-label">Type</span><span>{% for t in node_types(node) %}<a href="{{ url_for('class_page', qualified=t) }}" class="badge badge-sm {{ type_badge_class(t) }}">{{ type_label(t) }}</a> {% endfor %}</span></div>
+          <div class="acq-row"><span class="acq-label">Type</span><span>{% for t in node_types(node) %}<a href="{{ node_url(t) }}" class="badge badge-sm {{ type_badge_class(t) }}">{{ type_label(t) }}</a> {% endfor %}</span></div>
 {% endmacro %}
 
 {# A language literal (``lang2:zh`` ISO 639-1, ``lang3:zho`` ISO 639-3) as a link

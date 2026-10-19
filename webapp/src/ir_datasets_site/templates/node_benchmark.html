@@ -14,6 +14,7 @@
         <div class="acq-title">Overview</div>
         <div class="acq-rows">
 {{ m.type_row(node) }}
+{{ m.bundles_row(related) }}
           {% if node.metadata.metric %}<div class="acq-row"><span class="acq-label">Measures</span><span>{% for m in node.metadata.metric %}<code>{{ m }}</code>{% if not loop.last %}, {% endif %}{% endfor %}</span></div>{% endif %}
 {{ m.citation_row(node) }}
 {{ m.license_row(node) }}

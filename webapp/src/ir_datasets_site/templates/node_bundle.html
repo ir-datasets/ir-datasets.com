@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}{{ node.qualified_name }} &mdash; ir-datasets.com{% endblock %}
+{% block content %}
+
+{% set sections = [('overview', 'Overview')]
+  + ([('summary', 'Summary')] if node.metadata.summary else [])
+  + ([('contents', 'Contents')] if bundle.entries else [])
+  + [('raw-triples', 'Raw Triples')] %}
+{% call m.spy_layout(sections, node) %}
+<div class="card spy-target" id="overview">
+  <div class="card-body">
+{{ m.desc_para(node) }}
+    <div class="acq">
+{{ m.overview_icon() }}
+      <div class="acq-main">
+        <div class="acq-title">Overview</div>
+        <div class="acq-rows">
+{{ m.type_row(node) }}
+          <div class="acq-row"><span class="acq-label">Contains</span><span>{{ bundle.count }} node{{ '' if bundle.count == 1 else 's' }}{% if bundle.counts %} ({% for label, n in bundle.counts %}{{ n }} {{ label }}{{ '' if n == 1 else 's' }}{% if not loop.last %}, {% endif %}{% endfor %}){% endif %}</span></div>
+          {% if bundle.languages %}<div class="acq-row"><span class="acq-label">Language</span><span>{% for l in bundle.languages %}{{ m.language_link(l) }}{% if not loop.last %}, {% endif %}{% endfor %}</span></div>{% endif %}
+{{ m.citation_row(node) }}
+{{ m.license_row(node) }}
+{{ m.requires_row(requires, install_hint) }}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if node.metadata.summary %}
+<div class="card mt-3 spy-target" id="summary">
+  <div class="card-header"><h3 class="card-title">Summary</h3></div>
+  <div class="card-body markdown">{{ node.metadata.summary | markdown(node) }}</div>
+</div>
+{% endif %}
+
+{% if bundle.entries %}
+<div class="card mt-3 spy-target" id="contents">
+  <div class="card-header"><h3 class="card-title">Contents</h3><div class="card-subtitle ms-2 text-secondary">{{ bundle.count }}</div></div>
+  <div class="table-responsive">
+  <table class="table table-vcenter card-table table-sm">
+    <tbody>
+    {% for e in bundle.entries %}
+    <tr>
+      <td class="text-nowrap w-1">{% if e.type %}<a href="{{ node_url(e.name) }}">{{ node_code(e.name) }}</a>{% else %}<code>{{ e.name }}</code>{% endif %}</td>
+      <td class="text-nowrap w-1">{% if e.type %}<a href="{{ node_url(e.type) }}" class="badge badge-sm {{ type_badge_class(e.type) }}">{{ type_label(e.type) }}</a>{% endif %}</td>
+      <td>{{ e.description or '' }}</td>
+      <td class="text-nowrap w-1 text-secondary">{% for l in e.lang %}{{ m.language_link(l) }}{% if not loop.last %}, {% endif %}{% endfor %}</td>
+      <td class="text-nowrap w-1 text-end text-secondary">{% if e.count %}{{ '{:,}'.format(e.count|int) }}{% endif %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endif %}
+
+{{ m.triples_section(raw_triples, node.qualified_name) }}
+{% endcall %}
+{% endblock %}

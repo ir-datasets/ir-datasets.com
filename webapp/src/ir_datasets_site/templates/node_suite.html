@@ -17,6 +17,7 @@
         <div class="acq-title">Overview</div>
         <div class="acq-rows">
 {{ m.type_row(node) }}
+{{ m.bundles_row(related) }}
           <div class="acq-row"><span class="acq-label">Members</span><span>{{ members }}{% if related.member_suites %} ({{ related.member_benchmarks | length }} benchmarks, {{ related.member_suites | length }} suites){% endif %}</span></div>
 {{ m.citation_row(node) }}
 {{ m.license_row(node) }}
