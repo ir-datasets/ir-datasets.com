@@ -13,15 +13,41 @@
 {% endmacro %}
 
 {% macro type_tree(entry, depth) %}
-<div class="list-group-item py-2" style="padding-left: {{ 1 + depth * 1.75 }}rem">
-  <div class="d-flex align-items-center">
-    <a href="{{ entry.url }}">{{ node_code(entry.name) }}</a>
-    <span class="badge badge-sm align-middle ms-2 {{ entry.badge_class }}">{{ entry.label }}</span>
-    <span class="ms-auto text-secondary">{{ '{:,}'.format(entry.count) }}</span>
+<a href="{{ entry.url }}" class="list-group-item list-group-item-action type-row type-row-{{ entry.color }} d-flex" style="padding-left: {{ depth * 1.75 }}rem !important">
+  <div class="type-icon type-icon-{{ entry.color }}"></div>
+  <div class="type-row-body d-flex align-items-center">
+    <div class="flex-fill" style="min-width: 0">
+      {{ node_code(entry.name, 'text-cat-' ~ entry.color) }}
+      {% if entry.desc %}<div class="text-secondary small">{{ entry.desc }}</div>{% endif %}
+    </div>
+    <span class="ms-3 text-secondary">{{ '{:,}'.format(entry.count) }}</span>
   </div>
-  {% if entry.desc %}<div class="text-secondary small">{{ entry.desc }}</div>{% endif %}
-</div>
+</a>
 {% for child in entry.children %}{{ type_tree(child, depth + 1) }}{% endfor %}
+{% endmacro %}
+
+{% macro property_tree(e, depth, parent_name=none) %}
+<a href="{{ e.url }}" class="list-group-item list-group-item-action prop-row py-2 d-flex align-items-center" style="padding-left: {{ 1 + depth * 1.75 }}rem">
+  <div class="flex-fill" style="min-width: 0">
+    {{ node_code(e.name) }}
+    {% if e.structural %}<span class="badge badge-xs align-middle ms-2 bg-secondary-lt">structural</span>{% endif %}
+    {% if e.desc %}<div class="text-secondary small">{{ e.desc }}</div>{% endif %}
+  </div>
+  <span class="ms-3 text-nowrap">
+    {% if e.domain %}<span class="badge badge-xs align-middle {{ type_badge_class(e.domain) }}">{{ type_label(e.domain) }}</span>{% else %}<span class="badge badge-xs align-middle bg-secondary-lt">node</span>{% endif %}
+    <span class="text-secondary align-middle">&rarr;</span>
+    {% if e.range_type %}<span class="badge badge-xs align-middle {{ type_badge_class(e.range_type) }}">{{ type_label(e.range_type) }}</span>{% else %}<span class="badge badge-xs align-middle bg-secondary-lt">{{ {'node': 'node', 'literal': 'literal', 'json': 'json', 'type': 'class'}[e.range] }}</span>{% endif %}
+  </span>
+</a>
+{% for child in e.children %}{{ property_tree(child, depth + 1, e.name) }}{% endfor %}
+{% endmacro %}
+
+{# Links to nodes, comma-separated: the first `limit` and, if there are more, a "N more" that opens in place to show the rest. #}
+{% macro link_list(names, limit=10) %}
+{%- for name in names[:limit] %}<a href="{{ node_url(name) }}">{{ node_code(name) }}</a>{% if not loop.last or names|length > limit %}, {% endif %}{% endfor -%}
+{%- if names|length > limit %}<a href="#" class="more-links" onclick="this.hidden = true; this.nextElementSibling.hidden = false; return false">[{{ '{:,}'.format(names|length - limit) }} more]</a><span hidden>
+{%- for name in names[limit:] %}<a href="{{ node_url(name) }}">{{ node_code(name) }}</a>{% if not loop.last %}, {% endif %}{% endfor -%}
+</span>{% endif %}
 {% endmacro %}
 
 {% macro node_header(node) %}
@@ -33,7 +59,7 @@
 {% endif %}
 {% endmacro %}
 
-{% macro triples_section(raw_triples, self_name) %}
+{% macro triples_section(raw_triples, self_name, total=none) %}
 {% if raw_triples %}
 <div class="card mt-3 spy-target" id="raw-triples">
   <div class="card-header"><h3 class="card-title">Raw Triples</h3></div>
@@ -52,6 +78,7 @@
   </tbody>
   </table>
   </div>
+  {% if total and total > raw_triples|length %}<div class="card-footer text-secondary">Showing the first {{ '{:,}'.format(raw_triples|length) }} of {{ '{:,}'.format(total) }} triples. <a href="{{ url_for('triples_page', name=self_name) }}">Show all {{ '{:,}'.format(total) }}</a></div>{% endif %}
 </div>
 {% endif %}
 {% endmacro %}
@@ -60,17 +87,6 @@
 {% macro requires_row(requires, install_hint) %}
 {% if requires %}
 <div class="acq-row"><span class="acq-label">Extra packages</span><span>{% for r in requires %}<a href="https://pypi.org/project/{{ r }}/" class="badge badge-sm bg-yellow-lt">{{ r }}</a> {% endfor %}<span class="text-secondary">&mdash; not installed by default:</span> <code>{{ install_hint }}</code></span></div>
-{% endif %}
-{% endmacro %}
-
-{# The install command for a Use It card's header actions: the package this node
-   comes from plus any extra packages it needs. #}
-{% macro install_action(package, requires) %}
-{% set command = 'pip install ' ~ (([package] if package else []) + ((requires or []) | list)) | join(' ') %}
-{% if package or requires %}
-<div class="card-actions" id="install">
-  <code class="text-secondary">{{ command }}</code>
-</div>
 {% endif %}
 {% endmacro %}
 
@@ -104,10 +120,29 @@
 {% endif %}
 {% endmacro %}
 
+{# How to install what the node needs: the pip command, and a note on any extra packages. #}
+{% macro installation_card(package, requires) %}
+{% if package or requires %}
+<div class="card mt-3 spy-target" id="install">
+  <div class="card-header"><h3 class="card-title">Installation</h3></div>
+  {{ extra_dependencies_note(requires) }}
+  <pre class="bg-secondary-lt p-3 overflow-auto mb-0" style="border-radius: 0"><code class="language-bash">pip install {{ (([package] if package else []) + ((requires or []) | list)) | join(' ') }}</code></pre>
+</div>
+{% endif %}
+{% endmacro %}
+
 {% macro use_it_section(snippet, config=none, package=none, requires=none, variants=none) %}
 <div class="card mt-3 spy-target" id="use-it">
-  <div class="card-header"><h3 class="card-title">Use It</h3>{{ install_action(package, requires) }}</div>
-  {{ extra_dependencies_note(requires) }}
+  {#- One entry per way of using the node: (id, label, lang, code). A variant that has
+      several examples gives ``examples`` instead -- (id, label, code) each -- and a
+      <select> in its pane switches between them. -#}
+  {% set variants = variants or [{'id': 'python', 'label': 'Python API', 'lang': 'python', 'code': snippet}] %}
+  <div class="card-header">
+    <h3 class="card-title">Use It</h3>
+    <div class="variant-pills ms-3" role="group" aria-label="Usage example" data-variant-pills>
+      {% for v in variants %}<button type="button" class="variant-pill{% if loop.first %} active{% endif %}" data-variant="{{ v.id }}" aria-pressed="{{ 'true' if loop.first else 'false' }}">{{ v.label }}</button>{% endfor %}
+    </div>
+  </div>
   {% if config %}
   <div class="card-body border-bottom py-2 d-flex flex-wrap gap-3 align-items-center" data-use-it-config='{{ config|tojson|forceescape }}'>
     {% for facet in config.facets if facet.options|length > 1 %}
@@ -119,18 +154,11 @@
     {% endfor %}
   </div>
   {% endif %}
-  {#- One entry per way of using the node: (id, label, lang, code). A variant that has
-      several examples gives ``examples`` instead -- (id, label, code) each -- and a
-      <select> in its pane switches between them. -#}
-  {% set variants = variants or [{'id': 'python', 'label': 'Python API', 'lang': 'python', 'code': snippet}] %}
-  <div class="px-3 pt-3 pb-3 variant-pills" role="group" aria-label="Usage example" data-variant-pills>
-    {% for v in variants %}<button type="button" class="variant-pill{% if loop.first %} active{% endif %}" data-variant="{{ v.id }}" aria-pressed="{{ 'true' if loop.first else 'false' }}">{{ v.label }}</button>{% endfor %}
-  </div>
   {% for v in variants %}
   {% set examples = v.examples or [{'id': 'main', 'label': none, 'code': v.code}] %}
   <div data-variant-pane="{{ v.id }}"{% if not loop.first %} hidden{% endif %}>
     {% if examples|length > 1 %}
-    <div class="px-3 pb-3 d-flex align-items-center gap-2">
+    <div class="example-bar px-3 py-2 d-flex align-items-center gap-2">
       <label class="small text-secondary mb-0" for="example-{{ v.id }}">Example</label>
       <select class="form-select form-select-sm w-auto" id="example-{{ v.id }}" data-example-select>
         {% for ex in examples %}<option value="{{ ex.id }}">{{ ex.label }}</option>{% endfor %}
@@ -143,6 +171,7 @@
   </div>
   {% endfor %}
 </div>
+{{ installation_card(package, requires) }}
 {% endmacro %}
 
 {# Scroll-spy layout: a sticky section menu beside the page's cards. Each
@@ -199,7 +228,7 @@
           <div class="acq-row"><span class="acq-label">Overview</span><span>{% for b in related.overviews %}<a href="{{ node_url(b) }}">{{ node_code(b) }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</span></div>
 {% endif %}
 {% if related.bundles %}
-          <div class="acq-row"><span class="acq-label">Part of</span><span>{% for b in related.bundles %}<a href="{{ node_url(b) }}">{{ node_code(b) }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</span></div>
+          <div class="acq-row"><span class="acq-label">Part of</span><span>{{ link_list(related.bundles) }}</span></div>
 {% endif %}
 {% endmacro %}
 

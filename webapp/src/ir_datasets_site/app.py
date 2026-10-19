@@ -114,8 +114,8 @@ def graph_dump():
 TYPE_LABELS = {
     v2.DATA: 'Data',
     v2.TABLE: 'Table',
+    v2.SUITE: 'Suite',            # before Benchmark: a Suite is a Benchmark, and the first match wins
     v2.BENCHMARK: 'Benchmark',
-    v2.SUITE: 'Suite',
     v2.BUNDLE: 'Bundle',
 }
 
@@ -131,8 +131,8 @@ TYPE_LABELS_PLURAL = {
 TEMPLATE_BY_TYPE = {
     v2.DATA: 'node_resource.html',
     v2.TABLE: 'node_table.html',
-    v2.BENCHMARK: 'node_benchmark.html',
     v2.SUITE: 'node_suite.html',
+    v2.BENCHMARK: 'node_benchmark.html',
     v2.BUNDLE: 'node_bundle.html',
 }
 
@@ -276,6 +276,11 @@ def _package_of(node):
     meta = node.metadata
     if meta.get('package'):
         return meta['package']
+    if not hasattr(node, 'defined_in'):
+        # A node read from the store that never recorded one -- a generated name (one of CLIRMatrix's
+        # 150,000) has no per-node ``package`` triple; its provider's distribution stands for all.
+        provider = v2.graph.providers.get(node.qualified_name.split(':', 1)[0])
+        return getattr(provider, 'distribution', None)
     from ir_datasets.v2.vocabulary import row_for
     return row_for(node).get('package')
 
@@ -348,12 +353,18 @@ def _record_fields(node):
     return [c['name'] for c in node.metadata.get('column') or []] or None
 
 
+def _is_benchmark(t):
+    """Whether type ``t`` is a benchmark with facets: a ``Suite`` is a ``Benchmark`` too, but its
+    members, not tables, are what it is made of."""
+    return v2.is_subclass(t, v2.BENCHMARK) and not v2.is_subclass(t, v2.SUITE)
+
+
 def _python_snippet(node):
     """A minimal, accurate usage example -- only what the library actually
     supports today (no CLI/PyTerrier/XPM-IR generators yet; see
     ../PLAN_V2_SITE.md's reuse table)."""
     name = node.qualified_name
-    if v2.is_subclass(node.type, v2.BENCHMARK):
+    if _is_benchmark(node.type):
         singular = {'docs': 'doc', 'queries': 'query', 'qrels': 'qrel',
                     'scoreddocs': 'scoreddoc', 'docpairs': 'docpair', 'answers': 'answer'}
         lines = ["import ir_datasets.v2", f"ds = ir_datasets.v2.load({name!r})"]
@@ -384,7 +395,7 @@ def _snippet_variants(node, triples=()):
     resolve v2 names."""
     name = node.qualified_name
     variants = [{'id': 'python', 'label': 'Python API', 'lang': 'python', 'code': _python_snippet(node)}]
-    if v2.is_subclass(node.type, v2.BENCHMARK):
+    if _is_benchmark(node.type):
         head = f"import ir_datasets.v2\nds = ir_datasets.v2.load({name!r})\n"
         tables = [(e, f'ds.{e}', _record_fields(node.edge(e))) for e in v2.ENTITIES
                   if node.edge(e) is not None]
@@ -414,7 +425,7 @@ def _snippet_variants(node, triples=()):
     # Evaluation: qrels as ir_measures input
     if any(e == 'qrels' for e, _, _ in tables):
         # a qrels table page loads the table as ``qrels``, not the generic ``table``
-        qrels, evaluate_head = ('ds.qrels', head) if v2.is_subclass(node.type, v2.BENCHMARK) \
+        qrels, evaluate_head = ('ds.qrels', head) if _is_benchmark(node.type) \
             else ('qrels', head.replace('table = ', 'qrels = ', 1))
         variants.append({'id': 'evaluate', 'label': 'Evaluate', 'lang': 'python', 'code':
             "import ir_datasets.v2\nimport ir_measures\nfrom ir_measures import nDCG, P\n"
@@ -504,7 +515,7 @@ def _v1_id(name, triples):
 def _xpmir_snippet(node, tables, triples):
     """experimaestro-ir (datamaestro) addresses a dataset by its v1 id with dots
     (``irds.antique.test``), so only a benchmark that still has one gets an example."""
-    if not v2.is_subclass(node.type, v2.BENCHMARK):
+    if not _is_benchmark(node.type):
         return None
     v1 = _v1_id(node.qualified_name, triples)
     if v1 is None:
@@ -535,7 +546,7 @@ def _snippet_config(node):
     client-side (``static/use_it.js``): per facet that has alternatives, the
     default table and each alternative with its record fields. ``None`` when
     the node isn't a benchmark or nothing has alternatives."""
-    if not v2.is_subclass(node.type, v2.BENCHMARK):
+    if not _is_benchmark(node.type):
         return None
     singular = {'docs': 'doc', 'queries': 'query', 'qrels': 'qrel',
                 'scoreddocs': 'scoreddoc', 'docpairs': 'docpair', 'answers': 'answer'}
@@ -879,7 +890,7 @@ def _type_graph():
 
 
 def _type_entry(t, parents, children, counts):
-    return {'name': t, 'label': _type_label(t), 'badge_class': _type_badge_class(t),
+    return {'name': t, 'label': _type_label(t), 'badge_class': _type_badge_class(t), 'color': _type_color(t),
             'desc': _type_description(t), 'count': counts.get(t, 0),
             'url': _node_url(t),
             'children': [_type_entry(c, parents, children, counts) for c in children.get(t, [])]}
@@ -901,20 +912,37 @@ def _property_entries():
     declared = v2.graph_properties()
     counts = gq.property_counts(store, declared, providers=_selected_providers())
     return [{'name': q, 'owner': e['owner'], 'local': q.split(':', 1)[1], 'range': e['range'],
-             'structural': e['structural'], 'desc': e['desc'],
+             'structural': e['structural'], 'desc': e['desc'], 'parents': list(e.get('parents', ())),
+             'domain': e.get('domain'), 'range_type': e.get('range_type'),
              'count': counts.get(q, 0), 'url': _node_url(q)}
             for q, e in sorted(declared.items())]
+
+
+def _property_tree(entries):
+    """The properties as a hierarchy: each under its ``rdfs:subPropertyOf`` parent(s) -- one
+    that has two parents is listed under both. Roots are those with no declared parent;
+    the standard RDF/RDFS ones come last."""
+    by_name = {e['name']: e for e in entries}
+    children = {}
+    for e in entries:
+        for parent in e['parents']:
+            if parent in by_name:
+                children.setdefault(parent, []).append(e['name'])
+
+    def build(name, trail=()):
+        return dict(by_name[name], children=[build(c, (*trail, name)) for c in children.get(name, [])
+                                             if c not in trail])
+    roots = [e['name'] for e in entries if not any(p in by_name for p in e['parents'])]
+    roots.sort(key=lambda n: (by_name[n]['owner'] in ('rdf', 'rdfs'), 0 if n in children else 1, n))
+    return [build(n) for n in roots]
 
 
 @app.route('/properties')
 def properties():
     """Every declared graph property -- edges between nodes and literal-valued
-    properties -- grouped by the provider that owns it, each with its
-    description and how many triples use it."""
-    entries = _property_entries()
-    owners = sorted({e['owner'] for e in entries}, key=lambda o: (o in ('rdf', 'rdfs'), o))
-    groups = [(owner, [e for e in entries if e['owner'] == owner]) for owner in owners]
-    return render_template('properties.html', groups=groups)
+    properties -- as a hierarchy (a property under the ``rdfs:subPropertyOf`` it
+    specializes), each with its description and how many triples use it."""
+    return render_template('properties.html', roots=_property_tree(_property_entries()))
 
 
 #: How many of a graph property's triples its own page lists inline.
@@ -928,7 +956,8 @@ def property_page(qualified):
         abort(404, f'{qualified!r} is not a declared graph property')
     rows = gq.property_examples(store, qualified, entry['range'], providers=_selected_providers(),
                                  limit=PROPERTY_PAGE_ROWS)
-    return render_template('property.html', entry=entry, rows=rows, shown=len(rows))
+    subs = sorted(n for n, e in entries.items() if qualified in e['parents'])
+    return render_template('property.html', entry=entry, rows=rows, shown=len(rows), subs=subs)
 
 
 def _protocol_info(t):
@@ -1034,11 +1063,11 @@ def _is_overview(name):
 
 def _overviews_of(name, limit=300):
     """The Overviews that describe ``name``: any Overview that contains it, directly (a
-    ``hasPart`` edge) or through what it is part of -- a table is described by the overview
+    ``bundleItem`` edge) or through what it is part of -- a table is described by the overview
     of a benchmark that uses it, a file by that of the table parsed from it. Found by walking
     structural edges *up* from the node, stopping at the first Overview on each path, so
     a bundle need list only its main parts, not every table beneath them."""
-    structural = set(v2.STRUCTURAL_EDGES)
+    structural = set(v2.STRUCTURAL_EDGES) | {'irds:bundleItem'}      # membership is informational but counts here
     found, seen, frontier = [], {name}, [name]
     while frontier and len(seen) < limit:
         nxt = []
@@ -1073,7 +1102,7 @@ def _related(n, triples):
         out['alternative_note'] = _alt_note(name)
         out['alternatives'] = [(subject, _alt_note(subject)) for subject, kind, obj, other in triples
                                if obj == name and kind == 'irds:alternativeOf']
-    elif v2.is_subclass(n.type, v2.BENCHMARK):
+    elif _is_benchmark(n.type):
         for entity in v2.ENTITIES:
             table = n.edge(entity)
             if table is not None and (alts := _alternatives(table.qualified_name)):
@@ -1088,9 +1117,9 @@ def _related(n, triples):
             out['filtered_by'].append(obj)
         elif obj == name and kind in facet_kinds:
             out['used_by'].append((subject, kind.split(':', 1)[1]))
-        elif subject == name and kind == 'irds:hasPart':
+        elif subject == name and kind == 'irds:bundleItem':
             out['parts'].append(obj)
-        elif obj == name and kind == 'irds:hasPart':
+        elif obj == name and kind == 'irds:bundleItem':
             out['bundles'].append(subject)
         elif obj == name and kind == 'irds:member':
             out['suites'].append(subject)
@@ -1112,12 +1141,20 @@ def _related(n, triples):
 
 #: What a bundle's parts are called when counted, by kind (the first that fits wins).
 _BUNDLE_KINDS = (
-    (v2.BENCHMARK, 'benchmark'), (v2.SUITE, 'suite'), (v2.BUNDLE, 'bundle'),
+    (v2.SUITE, 'suite'), (v2.BENCHMARK, 'benchmark'), (v2.BUNDLE, 'bundle'),
     ('irds:Docs', 'document set'), ('irds:Queries', 'query set'), ('irds:Qrels', 'qrels'),
 )
 
 
-def _bundle_overview(parts):
+#: The most raw triples a node page lists (a big bundle has one per part).
+RAW_TRIPLE_ROWS = 100
+
+#: How many of a bundle's parts get a row on its page (and a lookup each). A bundle can have
+#: 150,000 (CLIRMatrix); the page then shows a sample and the counts for all of them.
+BUNDLE_ROWS = 300
+
+
+def _bundle_overview(parts, limit=BUNDLE_ROWS):
     """What a bundle page derives from its parts rather than has written: one entry per part
     (name, type, and the facts shown after it -- its description, and for a table its language
     and size), the language/license/citation across them, and a count by kind. Nothing here is
@@ -1125,13 +1162,24 @@ def _bundle_overview(parts):
     share a prefix) sit together."""
     entries, counts = [], {}
     languages, licenses, citations = [], [], []
+    everything = sorted(parts)
+    shown = everything[:limit]
+    if len(everything) > limit:
+        # counts for all of them from the cached type listing -- no lookup per part
+        types_by_name = {name: types for name, types, _p in gq._all_type_rows(store)}
+        for name in everything:
+            types = types_by_name.get(name)
+            if types:
+                kind = next((label for category, label in _BUNDLE_KINDS if v2.is_subclass(types[0], category)),
+                            'other')
+                counts[kind] = counts.get(kind, 0) + 1
 
     def note(into, values):
         for v in values if isinstance(values, (list, tuple)) else [values]:
             if v and v not in into:
                 into.append(v)
 
-    for name in sorted(parts):
+    for name in shown:
         view = gq.node_data(store, name)
         if view is None:
             entries.append({'name': name, 'type': None, 'description': None, 'lang': [], 'count': None})
@@ -1144,11 +1192,13 @@ def _bundle_overview(parts):
         note(languages, entry['lang'])
         note(licenses, view.values.get('license') or [])
         note(citations, view.values.get('citation') or [])
-        kind = next((label for category, label in _BUNDLE_KINDS if v2.is_subclass(view.type, category)),
-                    'other')
-        counts[kind] = counts.get(kind, 0) + 1
+        if len(everything) <= limit:
+            kind = next((label for category, label in _BUNDLE_KINDS if v2.is_subclass(view.type, category)),
+                        'other')
+            counts[kind] = counts.get(kind, 0) + 1
     return {'entries': entries, 'counts': list(counts.items()), 'languages': languages,
-            'licenses': licenses, 'citations': citations, 'count': len(parts)}
+            'licenses': licenses, 'citations': citations, 'count': len(everything),
+            'shown': len(shown)}
 
 
 _ALLOWED_HREF = re.compile(r'^(https?://|mailto:|/|#)', re.I)
@@ -1169,15 +1219,36 @@ def _resolve_ref(ref, bundle_name):
     return next((c for c in candidates if _node_exists(c)), None)
 
 
+#: Where a citation reference (``[[dblp:conf/emnlp/SunD20]]``, ``[[doi:10.x/y]]``) points -- the
+#: same targets the Citation row links to.
+_CITATION_URLS = {'dblp:': 'https://dblp.org/rec/{}.html?view=bibtex', 'doi:': 'https://doi.org/{}'}
+
+
 def _link_node_refs(text, bundle_name):
-    """Turn ``[[node]]`` references into Markdown links (code-styled), or plain code when
-    the node doesn't exist, so a stale reference is visible and not a dead link."""
+    """Turn ``[[...]]`` references into Markdown links: a node (``[[node]]``, code-styled), or a
+    citation (``[[dblp:key]]`` / ``[[doi:...]]``, with ``|label`` to say what to call it). A
+    node that doesn't exist is shown as plain code, so a stale reference is visible and not a
+    dead link."""
     def link(match):
         ref, label = match.group(1).strip(), (match.group(2) or '').strip()
+        for prefix, url in _CITATION_URLS.items():
+            if ref.startswith(prefix):
+                return f'[{label or f"`{ref}`"}]({url.format(ref[len(prefix):])})'
         target = _resolve_ref(ref, bundle_name)
         shown = label or f'`{ref}`'
         return f'[{shown}]({_node_url(target)})' if target else (label or f'`{ref}`')
     return _NODE_REF.sub(link, text)
+
+
+#: Fenced code blocks and inline code spans -- where ``<`` is left for Markdown to escape itself.
+_CODE = re.compile(r'(```.*?```|`[^`\n]+`)', re.S)
+
+
+def _escape_html_outside_code(text):
+    """Raw HTML in a summary is text, not markup: escape ``<`` everywhere except inside code,
+    where Markdown already escapes it (escaping it first would show a literal ``&lt;``)."""
+    parts = _CODE.split(text)
+    return ''.join(part if i % 2 else part.replace('<', '&lt;') for i, part in enumerate(parts))
 
 
 @app.template_filter('markdown')
@@ -1187,11 +1258,24 @@ def markdown_filter(text, node=None):
     source is escaped, and a link is kept only if it is http(s), mailto, or a local path."""
     import markdown
     source = _link_node_refs(str(text or ''), getattr(node, 'qualified_name', None))
-    html = markdown.markdown(source.replace('<', '&lt;'),
+    html = markdown.markdown(_escape_html_outside_code(source),
                              extensions=['tables', 'sane_lists', 'fenced_code'])
     html = re.sub(r'href="([^"]*)"',
                   lambda m: m.group(0) if _ALLOWED_HREF.match(m.group(1)) else 'href="#"', html)
     return Markup(html)
+
+
+@app.route('/triples/<path:name>')
+def triples_page(name):
+    """Every raw triple of a node on one page -- what a node's own page cuts off at
+    ``RAW_TRIPLE_ROWS``."""
+    try:
+        rows = gq.raw_triples_of(store, name) if gq.node_exists(store, name) else None
+    except ValueError:
+        rows = None
+    if rows is None:
+        abort(404, f'{name!r} is not a node in the graph')
+    return render_template('triples.html', name=name, raw_triples=rows)
 
 
 @app.route('/id/<path:name>')
@@ -1278,6 +1362,7 @@ def node(qualified):
         n = gq.node_data(store, qualified)
         triples = gq.triples_of(store, qualified) if n is not None else []
         raw_triples = gq.raw_triples_of(store, qualified) if n is not None else []
+        raw_total, raw_triples = len(raw_triples), raw_triples[:RAW_TRIPLE_ROWS]
     except ValueError:
         # `qualified` (straight from the URL) isn't a syntactically valid
         # IRI component -- e.g. a raw space, which some providers' own node
@@ -1307,7 +1392,7 @@ def node(qualified):
             derived.append({'name': subject, 'type': o.type if o else None})
     related = _related(n, triples)
     return render_template(
-        template, node=n, frozen=frozen, triples=triples, raw_triples=raw_triples,
+        template, node=n, frozen=frozen, triples=triples, raw_triples=raw_triples, raw_total=raw_total,
         requires=requires, install_hint=v2_requirements.install_hint(requires) if requires else None,
         package=package,
         derived=derived,

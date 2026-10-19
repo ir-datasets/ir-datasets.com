@@ -116,7 +116,7 @@
       </div>
       <div class="acq-main">
         <div class="acq-title">Benchmarks using this Table</div>
-        <div>{% for name, facet in related.used_by %}<a href="{{ node_url(name) }}">{{ node_code(name) }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</div>
+        <div>{{ m.link_list(related.used_by | map('first') | list) }}</div>
       </div>
     </div>
     {% endif %}
@@ -169,7 +169,7 @@
 
 {{ m.use_it_section(snippet, package=package, requires=requires, variants=snippet_variants) }}
 
-{{ m.triples_section(raw_triples, node.qualified_name) }}
+{{ m.triples_section(raw_triples, node.qualified_name, raw_total) }}
 {{ m.frozen_section(frozen) }}
 {% endcall %}
 {% endblock %}

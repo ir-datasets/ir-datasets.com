@@ -67,7 +67,7 @@
       <div class="acq-main">
         <div class="acq-title">Suites</div>
         <div class="acq-sub">Suites this benchmark belongs to.</div>
-        <div>{% for name in related.suites %}<a href="{{ node_url(name) }}">{{ node_code(name) }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</div>
+        <div>{{ m.link_list(related.suites) }}</div>
       </div>
     </div>
     {% endif %}
@@ -83,6 +83,6 @@
 
 {{ m.use_it_section(snippet, snippet_config, package=package, requires=requires, variants=snippet_variants) }}
 
-{{ m.triples_section(raw_triples, node.qualified_name) }}
+{{ m.triples_section(raw_triples, node.qualified_name, raw_total) }}
 {% endcall %}
 {% endblock %}

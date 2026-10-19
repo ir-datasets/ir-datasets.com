@@ -50,6 +50,7 @@ RDF_TYPE = ox.NamedNode('http://www.w3.org/1999/02/22-rdf-syntax-ns#type')
 RDFS_SUBCLASS_OF = ox.NamedNode('http://www.w3.org/2000/01/rdf-schema#subClassOf')
 RDF_PROPERTY = ox.NamedNode('http://www.w3.org/1999/02/22-rdf-syntax-ns#Property')
 RDFS_RANGE = ox.NamedNode('http://www.w3.org/2000/01/rdf-schema#range')
+RDFS_DOMAIN = ox.NamedNode('http://www.w3.org/2000/01/rdf-schema#domain')
 RDFS_COMMENT = ox.NamedNode('http://www.w3.org/2000/01/rdf-schema#comment')
 RDFS_SUBPROPERTY_OF = ox.NamedNode('http://www.w3.org/2000/01/rdf-schema#subPropertyOf')
 #: A graph property's ``rdfs:range`` term -> the standard IRI for it.
@@ -60,6 +61,7 @@ RANGE_IRIS = {
     'rdf:JSON': ox.NamedNode('http://www.w3.org/1999/02/22-rdf-syntax-ns#JSON'),
 }
 XSD_INTEGER = ox.NamedNode('http://www.w3.org/2001/XMLSchema#integer')
+XSD_BOOLEAN = ox.NamedNode('http://www.w3.org/2001/XMLSchema#boolean')
 #: A literal that holds a JSON document (a ``json``-range property).
 RDF_JSON = ox.NamedNode('http://www.w3.org/1999/02/22-rdf-syntax-ns#JSON')
 
@@ -176,9 +178,14 @@ def to_quads(triples):
             if predicate == 'rdf:type' and obj == 'rdf:Property':
                 yield ox.Quad(property_iri(subject), RDF_TYPE, RDF_PROPERTY, g)
             elif predicate == 'rdfs:range':
-                yield ox.Quad(property_iri(subject), RDFS_RANGE, RANGE_IRIS[obj], g)
+                yield ox.Quad(property_iri(subject), RDFS_RANGE, RANGE_IRIS.get(obj) or type_iri(obj), g)
+            elif predicate == 'rdfs:domain':
+                yield ox.Quad(property_iri(subject), RDFS_DOMAIN, type_iri(obj), g)
             elif predicate == 'rdfs:subPropertyOf':
                 yield ox.Quad(property_iri(subject), RDFS_SUBPROPERTY_OF, property_iri(obj), g)
+            elif predicate == 'irds:structuralEdge':
+                # a graph property describing itself: a structural edge says so
+                yield ox.Quad(property_iri(subject), meta_iri(predicate), ox.Literal('true', datatype=XSD_BOOLEAN), g)
             elif predicate == 'rdfs:comment':
                 yield ox.Quad(property_iri(subject), RDFS_COMMENT, ox.Literal(str(obj.value)), g)
             elif predicate == 'rdf:type':

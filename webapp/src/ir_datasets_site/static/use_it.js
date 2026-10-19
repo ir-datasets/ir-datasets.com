@@ -68,7 +68,7 @@
   }
 
   document.querySelectorAll('[data-variant-pills]').forEach(function (bar) {
-    var card = bar.parentNode;
+    var card = bar.closest('.card');
     var saved = recall('irds.variant');
     if (saved) showVariant(card, bar, saved);
     bar.addEventListener('click', function (e) {

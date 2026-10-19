@@ -10,6 +10,10 @@
     <div class="acq-rows">
       <div class="acq-row"><span class="acq-label">Kind</span><span>{{ {'node': 'edge (links a node to another node)', 'literal': 'literal property (a plain value)', 'json': 'literal property (a JSON document)', 'type': 'link to a graph class'}[entry.range] }}</span></div>
       {% if entry.range == 'node' %}<div class="acq-row"><span class="acq-label">Structural</span><span>{{ 'yes &mdash; part of what a node is built from'|safe if entry.structural else 'no &mdash; informational' |safe }}</span></div>{% endif %}
+      {% if entry.domain %}<div class="acq-row"><span class="acq-label">Applies to</span><span><a href="{{ node_url(entry.domain) }}"><code>{{ entry.domain }}</code></a></span></div>{% endif %}
+      {% if entry.range_type %}<div class="acq-row"><span class="acq-label">Points to</span><span><a href="{{ node_url(entry.range_type) }}"><code>{{ entry.range_type }}</code></a></span></div>{% endif %}
+      {% if entry.parents %}<div class="acq-row"><span class="acq-label">Specializes</span><span>{% for q in entry.parents %}<a href="{{ node_url(q) }}"><code>{{ q }}</code></a>{% if not loop.last %}, {% endif %}{% endfor %}</span></div>{% endif %}
+      {% if subs %}<div class="acq-row"><span class="acq-label">Specialized by</span><span>{% for q in subs %}<a href="{{ node_url(q) }}"><code>{{ q }}</code></a>{% if not loop.last %}, {% endif %}{% endfor %}</span></div>{% endif %}
       <div class="acq-row"><span class="acq-label">Owner</span><span>{% if entry.owner in ('rdf', 'rdfs') %}<code>{{ entry.owner }}</code> (standard RDF){% else %}<a href="{{ url_for('provider', prefix=entry.owner) }}"><code>{{ entry.owner }}</code></a>{% endif %}</span></div>
       <div class="acq-row"><span class="acq-label">Triples</span><span>{{ '{:,}'.format(entry.count) }}</span></div>
     </div>

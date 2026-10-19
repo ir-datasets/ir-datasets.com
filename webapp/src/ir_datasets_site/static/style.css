@@ -1,3 +1,10 @@
+:root {
+  --icon-resource: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='white'%3E%3Cpath stroke='none' d='M0 0h24v24H0z' fill='none'/%3E%3Cpath d='M12 2l.117 .007a1 1 0 0 1 .876 .876l.007 .117v4l.005 .15a2 2 0 0 0 1.838 1.844l.157 .006h4l.117 .007a1 1 0 0 1 .876 .876l.007 .117v9a3 3 0 0 1 -2.824 2.995l-.176 .005h-10a3 3 0 0 1 -2.995 -2.824l-.005 -.176v-14a3 3 0 0 1 2.824 -2.995l.176 -.005zm-1 9h-1a2 2 0 0 0 -2 2v3a2 2 0 0 0 2 2h1a2 2 0 0 0 2 -2v-3a2 2 0 0 0 -2 -2m4 0a1 1 0 0 0 -1 1v5a1 1 0 0 0 2 0v-5a1 1 0 0 0 -1 -1m-4 2v3h-1v-3z'/%3E%3Cpath d='M19 7h-4l-.001 -4.001z'/%3E%3C/svg%3E");
+  --icon-table: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='white'%3E%3Cpath stroke='none' d='M0 0h24v24H0z' fill='none'/%3E%3Cpath d='M4 11h4a1 1 0 0 1 1 1v8a1 1 0 0 1 -1 1h-2a3 3 0 0 1 -2.995 -2.824l-.005 -.176v-6a1 1 0 0 1 1 -1z'/%3E%3Cpath d='M21 12v6a3 3 0 0 1 -2.824 2.995l-.176 .005h-6a1 1 0 0 1 -1 -1v-8a1 1 0 0 1 1 -1h8a1 1 0 0 1 1 1z'/%3E%3Cpath d='M18 3a3 3 0 0 1 2.995 2.824l.005 .176v2a1 1 0 0 1 -1 1h-8a1 1 0 0 1 -1 -1v-4a1 1 0 0 1 1 -1h6z'/%3E%3Cpath d='M9 4v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1v-2a3 3 0 0 1 2.824 -2.995l.176 -.005h2a1 1 0 0 1 1 1z'/%3E%3C/svg%3E");
+  --icon-node: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath stroke='none' d='M0 0h24v24H0z' fill='none'/%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3C/svg%3E");
+  --icon-bundle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath stroke='none' d='M0 0h24v24H0z' fill='none'/%3E%3Cpath d='M12 4l-8 4l8 4l8 -4l-8 -4'/%3E%3Cpath d='M4 12l8 4l8 -4'/%3E%3Cpath d='M4 16l8 4l8 -4'/%3E%3C/svg%3E");
+}
+
 /* App-specific tweaks layered on top of Tabler (base.html loads it from the
    CDN) -- everything else (layout, navbar, cards, tables, forms, dark mode)
    is Tabler's own. */
@@ -98,7 +105,8 @@ code {
 .badge-cat-table::before,
 .badge-cat-bundle::before,
 .badge-cat-benchmark::before,
-.badge-cat-suite::before {
+.badge-cat-suite::before,
+.badge-cat-default::before {
   content: '';
   display: inline-block;
   width: 14px;
@@ -107,16 +115,19 @@ code {
   background-repeat: no-repeat;
   background-size: contain;
 }
+.badge-cat-default::before {
+  background-image: var(--icon-node);
+}
 .badge-cat-resource::before {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='white'%3E%3Cpath stroke='none' d='M0 0h24v24H0z' fill='none'/%3E%3Cpath d='M12 2l.117 .007a1 1 0 0 1 .876 .876l.007 .117v4l.005 .15a2 2 0 0 0 1.838 1.844l.157 .006h4l.117 .007a1 1 0 0 1 .876 .876l.007 .117v9a3 3 0 0 1 -2.824 2.995l-.176 .005h-10a3 3 0 0 1 -2.995 -2.824l-.005 -.176v-14a3 3 0 0 1 2.824 -2.995l.176 -.005zm-1 9h-1a2 2 0 0 0 -2 2v3a2 2 0 0 0 2 2h1a2 2 0 0 0 2 -2v-3a2 2 0 0 0 -2 -2m4 0a1 1 0 0 0 -1 1v5a1 1 0 0 0 2 0v-5a1 1 0 0 0 -1 -1m-4 2v3h-1v-3z'/%3E%3Cpath d='M19 7h-4l-.001 -4.001z'/%3E%3C/svg%3E");
+  background-image: var(--icon-resource);
 }
 .badge-cat-table::before {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='white'%3E%3Cpath stroke='none' d='M0 0h24v24H0z' fill='none'/%3E%3Cpath d='M4 11h4a1 1 0 0 1 1 1v8a1 1 0 0 1 -1 1h-2a3 3 0 0 1 -2.995 -2.824l-.005 -.176v-6a1 1 0 0 1 1 -1z'/%3E%3Cpath d='M21 12v6a3 3 0 0 1 -2.824 2.995l-.176 .005h-6a1 1 0 0 1 -1 -1v-8a1 1 0 0 1 1 -1h8a1 1 0 0 1 1 1z'/%3E%3Cpath d='M18 3a3 3 0 0 1 2.995 2.824l.005 .176v2a1 1 0 0 1 -1 1h-8a1 1 0 0 1 -1 -1v-4a1 1 0 0 1 1 -1h6z'/%3E%3Cpath d='M9 4v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1v-2a3 3 0 0 1 2.824 -2.995l.176 -.005h2a1 1 0 0 1 1 1z'/%3E%3C/svg%3E");
+  background-image: var(--icon-table);
 }
 .badge-cat-bundle::before,
 .badge-cat-benchmark::before,
 .badge-cat-suite::before {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath stroke='none' d='M0 0h24v24H0z' fill='none'/%3E%3Cpath d='M12 4l-8 4l8 4l8 -4l-8 -4'/%3E%3Cpath d='M4 12l8 4l8 -4'/%3E%3Cpath d='M4 16l8 4l8 -4'/%3E%3C/svg%3E");
+  background-image: var(--icon-bundle);
 }
 
 /* subject --edge--> object rows (triples_section macro): one grid shared by
@@ -392,3 +403,50 @@ h2 > .badge.badge-sm { top: -2px; }
 .markdown > :last-child { margin-bottom: 0; }
 .markdown td code { white-space: nowrap; }
 .markdown thead th { border-bottom: 1px solid var(--tblr-border-color, #dadfe5) !important; }
+
+/* A type's row on the classes page: its icon on the left, bigger than a badge's and centered,
+   then a border in the type's color. The icon is the badge's, as a mask painted in that color. */
+.type-icon {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  width: 2.5rem;
+}
+.type-icon::before {
+  content: '';
+  width: 1.75rem;
+  height: 1.75rem;
+  background-color: var(--cat-default);
+  -webkit-mask: var(--icon-node) center / contain no-repeat;
+  mask: var(--icon-node) center / contain no-repeat;
+}
+.type-row { border-left: 3px solid var(--cat-default) !important; }
+.type-row-resource { border-left-color: var(--cat-resource) !important; }
+.type-row-table { border-left-color: var(--cat-table) !important; }
+.type-row-bundle, .type-row-benchmark, .type-row-suite { border-left-color: var(--cat-bundle) !important; }
+.type-icon-resource::before { background-color: var(--cat-resource); -webkit-mask-image: var(--icon-resource); mask-image: var(--icon-resource); }
+.type-icon-table::before { background-color: var(--cat-table); -webkit-mask-image: var(--icon-table); mask-image: var(--icon-table); }
+.type-icon-bundle::before, .type-icon-benchmark::before, .type-icon-suite::before { background-color: var(--cat-bundle); -webkit-mask-image: var(--icon-bundle); mask-image: var(--icon-bundle); }
+.type-row { padding: 0 !important; }
+.type-row-body { flex: 1 1 auto; min-width: 0; padding: .5rem 1rem .5rem 0; }
+/* Hovering a class row tints it with a light version of its category color (through Tabler's
+   own hover variable, which its .list-group-item-action:hover rule paints with). */
+.type-row { --tblr-list-group-action-hover-bg: color-mix(in srgb, var(--cat-default) 8%, transparent); --tblr-list-group-action-active-bg: color-mix(in srgb, var(--cat-default) 8%, transparent); }
+.type-row-resource { --tblr-list-group-action-hover-bg: color-mix(in srgb, var(--cat-resource) 8%, transparent); --tblr-list-group-action-active-bg: color-mix(in srgb, var(--cat-resource) 8%, transparent); }
+.type-row-table { --tblr-list-group-action-hover-bg: color-mix(in srgb, var(--cat-table) 8%, transparent); --tblr-list-group-action-active-bg: color-mix(in srgb, var(--cat-table) 8%, transparent); }
+.type-row-bundle, .type-row-benchmark, .type-row-suite { --tblr-list-group-action-hover-bg: color-mix(in srgb, var(--cat-bundle) 8%, transparent); --tblr-list-group-action-active-bg: color-mix(in srgb, var(--cat-bundle) 8%, transparent); }
+/* The class name in a row is bold, its provider prefix is not. */
+.type-row code, .prop-row code { font-weight: 600; }
+.type-row code .text-secondary, .prop-row code .text-secondary { font-weight: 400; }
+
+/* A smaller badge, for the domain -> range pair on a property row. */
+.badge.badge-xs { font-size: .65rem; padding: .15em .45em; min-height: 0; }
+.badge.badge-xs::before { width: 10px; height: 10px; vertical-align: -1px; }
+
+/* The Example picker above a snippet: a gray darker than the code block's, so it reads as a third surface. */
+.example-bar {
+  background: color-mix(in srgb, var(--tblr-secondary, #667382) 20%, var(--tblr-bg-surface, #fff));
+  border-bottom: 1px solid color-mix(in srgb, var(--tblr-secondary, #667382) 30%, transparent);
+}

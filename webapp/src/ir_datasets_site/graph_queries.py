@@ -12,7 +12,7 @@ import json
 import re
 
 from .rdf_schema import (
-    FROZEN_FIELDS, RDF_JSON, RDF_PROPERTY, RDF_TYPE, RDFS_COMMENT, RDFS_RANGE, RDFS_SUBCLASS_OF,
+    FROZEN_FIELDS, RDF_JSON, RDF_PROPERTY, RDF_TYPE, RDFS_COMMENT, RDFS_DOMAIN, RDFS_RANGE, RDFS_SUBCLASS_OF,
     RDFS_SUBPROPERTY_OF, edge_iri, edge_kind, graph_name,
     graph_iri, meta_field, meta_iri, node_iri, node_name, type_iri, type_name,
 )
@@ -166,6 +166,8 @@ def property_term(qualified, range):
         return RDFS_SUBCLASS_OF
     if qualified == 'rdfs:range':
         return RDFS_RANGE
+    if qualified == 'rdfs:domain':
+        return RDFS_DOMAIN
     if qualified == 'rdfs:comment':
         return RDFS_COMMENT
     if qualified == 'rdfs:subPropertyOf':

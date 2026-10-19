@@ -186,6 +186,6 @@
 
 {{ m.use_it_section(snippet, package=package, requires=requires, variants=snippet_variants) }}
 
-{{ m.triples_section(raw_triples, node.qualified_name) }}
+{{ m.triples_section(raw_triples, node.qualified_name, raw_total) }}
 {% endcall %}
 {% endblock %}

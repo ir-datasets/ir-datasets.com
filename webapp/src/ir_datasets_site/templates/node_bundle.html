@@ -17,7 +17,7 @@
         <div class="acq-title">Overview</div>
         <div class="acq-rows">
 {{ m.type_row(node) }}
-          <div class="acq-row"><span class="acq-label">Contains</span><span>{{ bundle.count }} node{{ '' if bundle.count == 1 else 's' }}{% if bundle.counts %} ({% for label, n in bundle.counts %}{{ n }} {{ label }}{{ '' if n == 1 else 's' }}{% if not loop.last %}, {% endif %}{% endfor %}){% endif %}</span></div>
+          <div class="acq-row"><span class="acq-label">Contains</span><span>{{ '{:,}'.format(bundle.count) }} node{{ '' if bundle.count == 1 else 's' }}{% if bundle.counts %} ({% for label, n in bundle.counts %}{{ '{:,}'.format(n) }} {{ label }}{{ '' if n == 1 else 's' }}{% if not loop.last %}, {% endif %}{% endfor %}){% endif %}</span></div>
           {% if bundle.languages %}<div class="acq-row"><span class="acq-label">Language</span><span>{% for l in bundle.languages %}{{ m.language_link(l) }}{% if not loop.last %}, {% endif %}{% endfor %}</span></div>{% endif %}
 {{ m.citation_row(node) }}
 {{ m.license_row(node) }}
@@ -37,7 +37,7 @@
 
 {% if bundle.entries %}
 <div class="card mt-3 spy-target" id="contents">
-  <div class="card-header"><h3 class="card-title">Contents</h3><div class="card-subtitle ms-2 text-secondary">{{ bundle.count }}</div></div>
+  <div class="card-header"><h3 class="card-title">Contents</h3><div class="card-subtitle ms-2 text-secondary">{{ '{:,}'.format(bundle.count) }}</div></div>
   <div class="table-responsive">
   <table class="table table-vcenter card-table table-sm">
     <tbody>
@@ -53,9 +53,10 @@
     </tbody>
   </table>
   </div>
+  {% if bundle.shown < bundle.count %}<div class="card-footer text-secondary">Showing the first {{ '{:,}'.format(bundle.shown) }} of {{ '{:,}'.format(bundle.count) }}, by name. <a href="{{ url_for('provider', prefix=node.qualified_name.split(':')[0]) }}">Browse all of {{ node.qualified_name.split(':')[0] }}'s nodes</a>.</div>{% endif %}
 </div>
 {% endif %}
 
-{{ m.triples_section(raw_triples, node.qualified_name) }}
+{{ m.triples_section(raw_triples, node.qualified_name, raw_total) }}
 {% endcall %}
 {% endblock %}
