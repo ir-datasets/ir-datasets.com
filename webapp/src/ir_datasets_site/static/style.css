@@ -450,3 +450,7 @@ h2 > .badge.badge-sm { top: -2px; }
   background: color-mix(in srgb, var(--tblr-secondary, #667382) 20%, var(--tblr-bg-surface, #fff));
   border-bottom: 1px solid color-mix(in srgb, var(--tblr-secondary, #667382) 30%, transparent);
 }
+
+/* The "(edit)" / "(add a description)" links on documentation: small, lowercase, in parentheses. */
+.doc-link { font-size: .75rem; color: var(--tblr-secondary, #667382); }
+.doc-link a { text-transform: lowercase; }

@@ -3,14 +3,15 @@
 {% block title %}{{ node.qualified_name }} &mdash; ir-datasets.com{% endblock %}
 {% block content %}
 
+{% set is_overview = 'irds:Overview' in node_types(node) %}
+{% set show_contents = bundle.entries and not is_overview %}
 {% set sections = [('overview', 'Overview')]
-  + ([('summary', 'Summary')] if node.metadata.summary else [])
-  + ([('contents', 'Contents')] if bundle.entries else [])
+  + ([('contents', 'Contents')] if show_contents else [])
   + [('raw-triples', 'Raw Triples')] %}
+{% set sections = with_about(sections, node) %}
 {% call m.spy_layout(sections, node) %}
 <div class="card spy-target" id="overview">
   <div class="card-body">
-{{ m.desc_para(node) }}
     <div class="acq">
 {{ m.overview_icon() }}
       <div class="acq-main">
@@ -28,14 +29,9 @@
   </div>
 </div>
 
-{% if node.metadata.summary %}
-<div class="card mt-3 spy-target" id="summary">
-  <div class="card-header"><h3 class="card-title">Summary</h3></div>
-  <div class="card-body markdown">{{ node.metadata.summary | markdown(node) }}</div>
-</div>
-{% endif %}
+{{ m.about_card(node, bundle.entries|map(attribute="name")|list) }}
 
-{% if bundle.entries %}
+{% if show_contents %}
 <div class="card mt-3 spy-target" id="contents">
   <div class="card-header"><h3 class="card-title">Contents</h3><div class="card-subtitle ms-2 text-secondary">{{ '{:,}'.format(bundle.count) }}</div></div>
   <div class="table-responsive">

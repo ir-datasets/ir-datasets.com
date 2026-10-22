@@ -5,12 +5,12 @@
 
 {% set sections = [('overview', 'Overview'), ('raw-triples', 'Raw Triples')]
   + ([('frozen', 'Declared Facts')] if frozen else []) %}
+{% set sections = with_about(sections, node) %}
 {% call m.spy_layout(sections, node) %}
 <p class="text-secondary">This node's type (<code>{{ node.type }}</code>) isn't one this
 site has a dedicated template for yet &mdash; likely a third-party provider's
 own vocabulary. Showing its raw metadata and edges instead.</p>
 <div class="card spy-target" id="overview">
-  {% if node.metadata.description %}<div class="card-body border-bottom">{{ m.desc_para(node) }}</div>{% endif %}
   <div class="table-responsive">
   <table class="table table-vcenter card-table">
   <tbody>
@@ -25,6 +25,8 @@ own vocabulary. Showing its raw metadata and edges instead.</p>
   {% if node.metadata.citation %}<div class="card-body border-top">
   </div>{% endif %}
 </div>
+
+{{ m.about_card(node) }}
 
 {{ m.triples_section(raw_triples, node.qualified_name, raw_total) }}
 {{ m.frozen_section(frozen) }}

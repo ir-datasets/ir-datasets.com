@@ -4,10 +4,10 @@
 {% block content %}
 
 {% set sections = [('overview', 'Overview'), ('related', 'Related Nodes'), ('use-it', 'Use It'), ('raw-triples', 'Raw Triples')] %}
+{% set sections = with_about(sections, node) %}
 {% call m.spy_layout(sections, node) %}
 <div class="card spy-target" id="overview">
   <div class="card-body">
-{{ m.desc_para(node) }}
     <div class="acq">
 {{ m.overview_icon() }}
       <div class="acq-main">
@@ -23,6 +23,8 @@
     </div>
   </div>
 </div>
+
+{{ m.about_card(node) }}
 
 <div class="card mt-3 spy-target" id="related">
   <div class="card-body">

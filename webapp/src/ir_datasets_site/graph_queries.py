@@ -43,6 +43,9 @@ def _value_sort_key(value):
 def _local(field):
     """``'irds:description'`` -> ``'description'``: a node's metadata is keyed by
     local name, as the templates read it."""
+    if field == 'documentation:source':
+        # not `source`: that is a Resource's `irds:source` (where its bytes come from)
+        return 'documentationSource'
     return field.split(':', 1)[1] if ':' in field else field
 
 

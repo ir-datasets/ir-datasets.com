@@ -1240,6 +1240,25 @@ def _link_node_refs(text, bundle_name):
     return _NODE_REF.sub(link, text)
 
 
+#: ``[text](irds:node)`` in a documentation page: a standard Markdown link whose target is a
+#: fully qualified node (or a ``dblp:``/``doi:`` citation). ``http(s)``/``mailto`` targets are left to
+#: Markdown.
+_QUALIFIED_LINK = re.compile(r'(?<!!)\[((?:[^\[\]\\]|\\.)*)\]\(\s*<?((?!https?:|mailto:)[A-Za-z][A-Za-z0-9_-]*:[^)\s>]+)>?\s*\)')
+
+
+def _link_qualified(text):
+    """Turn ``[text](irds:node)`` into a link to the node page, ``[text](dblp:key)`` into the
+    citation's page. A target that is not a node in the graph is shown as the plain text, so a
+    stale link in an open-edit page reads as text and never as a dead link."""
+    def link(match):
+        label, target = match.group(1), match.group(2)
+        for prefix, url in _CITATION_URLS.items():
+            if target.startswith(prefix):
+                return f'[{label}]({url.format(target[len(prefix):])})'
+        return f'[{label}]({_node_url(target)})' if _node_exists(target) else label
+    return _QUALIFIED_LINK.sub(link, text)
+
+
 #: Fenced code blocks and inline code spans -- where ``<`` is left for Markdown to escape itself.
 _CODE = re.compile(r'(```.*?```|`[^`\n]+`)', re.S)
 
@@ -1253,16 +1272,80 @@ def _escape_html_outside_code(text):
 
 @app.template_filter('markdown')
 def markdown_filter(text, node=None):
-    """Render a node's hand-written summary. ``[[node]]`` / ``[[node|label]]`` become links to
-    nodes (resolved relative to ``node``, the bundle the summary belongs to). Raw HTML in the
+    """Render a node's documentation (``documentation:about``) or card summary. ``[text](irds:node)``
+    links to nodes (legacy ``[[node]]`` / ``[[node|label]]`` still work, resolved relative to ``node``). Raw HTML in the
     source is escaped, and a link is kept only if it is http(s), mailto, or a local path."""
     import markdown
-    source = _link_node_refs(str(text or ''), getattr(node, 'qualified_name', None))
+    source = _link_node_refs(_link_qualified(str(text or '')), getattr(node, 'qualified_name', None))
     html = markdown.markdown(_escape_html_outside_code(source),
                              extensions=['tables', 'sane_lists', 'fenced_code'])
     html = re.sub(r'href="([^"]*)"',
                   lambda m: m.group(0) if _ALLOWED_HREF.match(m.group(1)) else 'href="#"', html)
     return Markup(html)
+
+
+_INDEXED = None
+
+
+def _providers_with_an_index():
+    """Provider prefixes whose documentation repository has a ``<prefix>/_index.yaml`` -- read off the
+    sources the snapshot recorded, so a link never points at a file that is not there."""
+    global _INDEXED
+    if _INDEXED is None:
+        from . import rdf_schema
+        sources = {q.object.value for q in store.quads_for_pattern(
+            None, rdf_schema.meta_iri('documentation:source'), None)}
+        _INDEXED = {path.split('/', 1)[0] for path in sources if path.endswith('/_index.yaml')}
+    return _INDEXED
+
+
+def _doc_links(node, parts=()):
+    """Where to send someone who wants to improve a node's documentation, from the one file its
+    documentation was read from (``documentation:source``: its page if it has one, else its entry in
+    the provider's index). ``about`` edits the page, or writes one (a new file with the name and a
+    skeleton filled in); ``description`` edits the source file, or, with no documentation at all,
+    adds one: a line in the provider's index, copied to the clipboard because GitHub cannot pre-fill
+    it, or a new page where there is no index. Text from elsewhere has no source here, so it only
+    offers to write a page."""
+    from ir_datasets.v2 import documentation_provider as docs
+    meta = node.metadata
+    name = node.qualified_name
+    if name.startswith('legacy:'):      # a v1 id is an alias of the node that replaced it: document that
+        return {'about': None, 'description': None}
+    source = meta.get('documentationSource')
+    is_page = bool(source) and source.endswith('.md')
+
+    def new():
+        return docs.new_page_url(name, description=meta.get('description') or None, parts=list(parts))
+
+    if is_page:
+        about = {'label': 'edit this page' if meta.get('about') else 'add documentation',
+                 'url': docs.edit_url(source), 'exists': bool(meta.get('about'))}
+    else:
+        about = {'label': 'write a page' if meta.get('description') else 'add documentation',
+                 'url': new(), 'exists': False}
+    if source:
+        description = {'label': 'edit', 'url': docs.edit_url(source)}
+    elif name.split(':', 1)[0] in _providers_with_an_index():
+        description = {'label': 'add a description', 'url': docs.edit_url(docs.index_path(name)),
+                       'clipboard': docs.index_line(name), 'title': 'Copies the line to add; paste it into the file'}
+    else:
+        description = {'label': 'add a description', 'url': new()}
+    return {'about': about, 'description': description}
+
+
+def _with_about(sections, node):
+    """``sections`` with an About entry right after Overview, where its card is -- if the node has
+    anything written to show."""
+    sections = list(sections)
+    if not (node.metadata.get('about') or node.metadata.get('summary')):
+        return sections
+    at = next((i + 1 for i, (key, _) in enumerate(sections) if key == 'overview'), 0)
+    return sections[:at] + [('about', 'About')] + sections[at:]
+
+
+app.jinja_env.globals['doc_links'] = _doc_links
+app.jinja_env.globals['with_about'] = _with_about
 
 
 @app.route('/triples/<path:name>')

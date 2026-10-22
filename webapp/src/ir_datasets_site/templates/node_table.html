@@ -8,12 +8,12 @@
   + ([('samples', 'Sample Rows')] if sample_table[1] else [])
   + [('use-it', 'Use It'), ('raw-triples', 'Raw Triples')]
   + ([('frozen', 'Declared Facts')] if frozen else []) %}
+{% set sections = with_about(sections, node) %}
 {% call m.spy_layout(sections, node) %}
 <div class="row g-3 align-items-start">
 <div class="col-xl">
 <div class="card spy-target" id="overview">
   <div class="card-body">
-{{ m.desc_para(node) }}
     <div class="acq">
 {{ m.overview_icon() }}
       <div class="acq-main">
@@ -74,6 +74,8 @@
 </div>
 {% endif %}
 </div>
+
+{{ m.about_card(node) }}
 
 {% if related.sources or related.derived_from or related.used_by or related.alternatives or related.alternative_of %}
 <div class="card mt-3 spy-target" id="related">

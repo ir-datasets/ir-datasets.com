@@ -51,9 +51,13 @@
 {% endmacro %}
 
 {% macro node_header(node) %}
-<h2 class="mb-3">
+<h2 class="mb-0">
   <code class="select"><a href="{{ url_for('provider', prefix=provider_of(node.qualified_name)) }}" class="text-secondary">{{ provider_of(node.qualified_name) }}:</a>{{ node.qualified_name.split(':', 1)[1] }}</code>
 </h2>
+{% set docs = doc_links(node) %}
+{% if node.metadata.description or docs.description %}
+<p class="node-description text-secondary mb-3">{{ node.metadata.description or '' }}{% if docs.description %}{% if node.metadata.description %} {% endif %}<span class="doc-link ms-1"><a href="{{ docs.description.url }}" target="_blank" rel="noopener"{% if docs.description.clipboard %} data-copy="{{ docs.description.clipboard }}" title="{{ docs.description.title }}"{% endif %}>({{ docs.description.label }})</a></span>{% endif %}</p>
+{% endif %}
 {% if node.metadata.deprecated %}
 <div class="alert alert-warning">{{ node.metadata.deprecated }}</div>
 {% endif %}
@@ -210,10 +214,23 @@
 {% endif %}
 {% endmacro %}
 
-{# The node's description: plain text at the top of its Overview card. #}
-{% macro desc_para(node) %}{% if node.metadata.description %}
-    <p>{{ node.metadata.description }}</p>
-{% endif %}{% endmacro %}
+{# The node's About card: its documentation page (Markdown, community-edited), with where to edit it.
+   With nothing written there is no card, only a small centered link between the cards to add some.
+   ``parts`` names what a new page could list, for a bundle or suite. #}
+{% macro about_card(node, parts=[]) %}
+{% set docs = doc_links(node, parts) %}
+{% set about = node.metadata.about or node.metadata.summary %}
+{% if about %}
+<div class="card mt-3 spy-target" id="about">
+  <div class="card-header"><h3 class="card-title">About</h3>
+    <div class="ms-auto doc-link"><a href="{{ docs.about.url }}" target="_blank" rel="noopener">({{ docs.about.label }})</a></div>
+  </div>
+  <div class="card-body markdown">{{ about | markdown(node) }}</div>
+</div>
+{% else %}
+<div class="text-center doc-link my-2"><a href="{{ docs.about.url }}" target="_blank" rel="noopener">({{ docs.about.label }})</a></div>
+{% endif %}
+{% endmacro %}
 
 {# The generic (gray) box icon leading every node's Overview box. #}
 {% macro overview_icon() %}

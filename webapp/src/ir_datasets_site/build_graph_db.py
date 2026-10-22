@@ -67,6 +67,12 @@ def build(providers=DEFAULT_PROVIDERS, out=DEFAULT_STORE_PATH, dump=True):
     if out.exists():
         shutil.rmtree(out)
     store = ox.Store(str(out))
+    if 'documentation' in providers:
+        # The documentation is live, and this is a snapshot of it: ask GitHub now, whatever the
+        # cache's age, so the build never misses an edit made in the last hour.
+        from ir_datasets.v2 import documentation_provider
+        logger.info('refreshing the documentation from GitHub')
+        documentation_provider.refresh()
     logger.info('fetching triples for providers=%s', list(providers))
     triples = v2.graph.export_triples(providers=list(providers))
     try:
