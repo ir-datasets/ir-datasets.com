@@ -691,6 +691,16 @@ def _is_irds_mirror(url):
 app.jinja_env.globals['is_google_drive'] = _is_google_drive
 app.jinja_env.globals['is_irds_mirror'] = _is_irds_mirror
 app.jinja_env.globals['type_badge_class'] = _type_badge_class
+
+
+def _node_badge(name):
+    """A small inline type badge for a node, by qualified name (its real type, e.g. ``File``)."""
+    d = gq.node_data(store, name)
+    t = (d or v2.graph[name]).type
+    return Markup(f'<span class="badge badge-xs align-middle {_type_badge_class(t)}" style="padding-bottom: calc(.15em + 1px); position: relative; top: -1px">{escape(_type_label(t))}</span>')
+
+
+app.jinja_env.globals['node_badge'] = _node_badge
 app.jinja_env.globals['type_color'] = _type_color
 def _node_code(name, cls=''):
     """A node's qualified name as ``<code>``, its ``provider:`` prefix in

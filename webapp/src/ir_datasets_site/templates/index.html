@@ -22,13 +22,65 @@
     document, query, and relevance judgment collections through a common interface, linked to one another in a graph.</p>
 
     <p>Datasets are organized into three main types:</p>
-    <p class="ms-4"><a href="{{ url_for('search', type='irds:Data') }}" class="badge badge-cat-resource">Data</a> nodes are raw sources, like downloadable files. Example: <a href="/n/irds:cranfield.tar.gz"><code>irds:cranfield.tar.gz</code></a></p>
-    <p class="ms-4"><a href="{{ url_for('search', type='irds:Table') }}" class="badge badge-cat-table">Tables</a> parse <strong class="text-cat-resource">Data</strong> into records with a consistent structure. Example: <a href="/n/irds:msmarco-passage"><code>irds:msmarco-passage</code></a></p>
-    <p class="ms-4"><a href="{{ url_for('search', type='irds:Bundle') }}" class="badge badge-cat-bundle">Bundles</a> are collections of <strong class="text-cat-table">Tables</strong> and other <strong class="text-cat-bundle">Bundles</strong>. Examples: <a href="/n/irds:antique-test"><code>irds:antique-test</code></a> (a <a href="{{ url_for('search', type='irds:Benchmark') }}">Benchmark</a>) and <a href="/n/irds:bright"><code>irds:bright</code></a> (a <a href="{{ url_for('search', type='irds:Suite') }}">Suite</a>).</p>
+    <p class="ms-4"><a href="{{ url_for('search', type='irds:Data') }}" class="badge badge-cat-resource" style="position: relative; top: 1px">Data</a> nodes are raw sources, like downloadable files. Examples: <a href="{{ node_url('irds:cranfield.tar.gz') }}">{{ node_code('irds:cranfield.tar.gz') }}</a> {{ node_badge('irds:cranfield.tar.gz') }} and <a href="{{ node_url('irds:clueweb12.dir') }}">{{ node_code('irds:clueweb12.dir') }}</a> {{ node_badge('irds:clueweb12.dir') }}</p>
+    <p class="ms-4"><a href="{{ url_for('search', type='irds:Table') }}" class="badge badge-cat-table" style="position: relative; top: 1px">Tables</a> parse <strong class="text-cat-resource">Data</strong> into records with a consistent structure. Examples: <a href="{{ node_url('irds:msmarco-passage') }}">{{ node_code('irds:msmarco-passage') }}</a> {{ node_badge('irds:msmarco-passage') }} and <a href="{{ node_url('irds:trec-dl-2019-passage-qrels') }}">{{ node_code('irds:trec-dl-2019-passage-qrels') }}</a> {{ node_badge('irds:trec-dl-2019-passage-qrels') }}</p>
+    <p class="ms-4"><a href="{{ url_for('search', type='irds:Bundle') }}" class="badge badge-cat-bundle" style="position: relative; top: 1px">Bundles</a> are collections of <strong class="text-cat-table">Tables</strong> and other <strong class="text-cat-bundle">Bundles</strong>. Examples: <a href="{{ node_url('irds:antique-test') }}">{{ node_code('irds:antique-test') }}</a> {{ node_badge('irds:antique-test') }} and <a href="{{ node_url('irds:bright') }}">{{ node_code('irds:bright') }}</a> {{ node_badge('irds:bright') }}</p>
 
     <p>See all <a href="{{ url_for('classes') }}">classes</a> and <a href="{{ url_for('properties') }}">properties</a> of the graph, each with a description.</p>
 
     <p class="mb-0">Providers: {% for prefix in providers %}<a href="{{ url_for('provider', prefix=prefix) }}"><code>{{ prefix }}</code></a>{% if not loop.last %}, {% endif %}{% endfor %}</p>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h3 class="card-title">Not sure where to start?</h3>
+    <p>Check out these popular datasets:</p>
+    <ul class="mb-0">
+      {% for name, desc in [
+        ('irds:msmarco', 'MS MARCO passage and document ranking, with all its variants'),
+        ('irds:beir', 'the BEIR zero-shot retrieval benchmark suite'),
+        ('irds:bright', 'reasoning-intensive retrieval'),
+        ('irds:trec-dl-2019-passage', 'TREC Deep Learning 2019, passage ranking'),
+        ('irds:trec-robust-2004', 'TREC Robust 2004, a classic news ad-hoc collection'),
+      ] %}
+      <li><a href="{{ node_url(name) }}">{{ node_code(name) }}</a> {{ node_badge(name) }} &ndash; {{ desc }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header">
+    <h3 class="card-title">Using it</h3>
+    <div class="variant-pills ms-3" role="group" aria-label="Usage example" data-variant-pills>
+      <button type="button" class="variant-pill active" data-variant="home-read" aria-pressed="true">Loading a Corpus</button>
+      <button type="button" class="variant-pill" data-variant="home-pyterrier" aria-pressed="false">Conducting an Experiment</button>
+    </div>
+  </div>
+  <div data-variant-pane="home-read">
+    <pre class="bg-secondary-lt p-3 overflow-auto mb-0" style="border-radius: 0"><code class="language-python">import ir_datasets.v2
+msmarco = ir_datasets.v2.load('irds:msmarco-passage')
+len(msmarco)  # -> 8841823 (number of passages)
+for psg in msmarco:  # loop over all passages
+    print(psg.doc_id, psg.text)
+msmarco.lookup('7067032').text  # look up a passage by its id</code></pre>
+  </div>
+  <div data-variant-pane="home-pyterrier" hidden>
+    <pre class="bg-secondary-lt p-3 overflow-auto mb-0" style="border-radius: 0"><code class="language-python">import pandas as pd
+import pyterrier as pt
+import ir_datasets.v2
+
+dl19 = ir_datasets.v2.load('irds:trec-dl-2019-passage')
+
+# index the passages
+index = pt.terrier.TerrierIndex('msmarco-passage.terrier')
+index.index({'docno': d.doc_id, 'text': d.text} for d in dl19.docs)
+
+# evaluate BM25 on the TREC DL 2019 queries
+queries = pd.DataFrame(dl19.queries).rename(columns={'query_id': 'qid', 'text': 'query'})
+qrels = pd.DataFrame(dl19.qrels).rename(columns={'query_id': 'qid', 'doc_id': 'docno', 'relevance': 'label'})
+pt.Experiment([index.bm25()], queries, qrels, eval_metrics=['ndcg_cut_10', 'map'])</code></pre>
   </div>
 </div>
 {% endblock %}
