@@ -1329,7 +1329,7 @@ def _doc_links(node, parts=()):
         return docs.new_page_url(name, description=meta.get('description') or None, parts=list(parts))
 
     if is_page:
-        about = {'label': 'edit this page' if meta.get('about') else 'add documentation',
+        about = {'label': 'edit this section' if meta.get('about') else 'add "About" section',
                  'url': docs.edit_url(source), 'exists': bool(meta.get('about'))}
     else:
         about = {'label': 'write a page' if meta.get('description') else 'add documentation',
