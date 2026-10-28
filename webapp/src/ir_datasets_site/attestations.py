@@ -8,6 +8,7 @@ has a signature, ``verified`` whether the server checked that signature on recei
 the signing identity's username (or ``None``).
 """
 import collections
+import datetime
 import itertools
 
 KINDS = ('hash', 'visual', 'evaluation', 'identity')
@@ -38,6 +39,18 @@ def _date(record):
 def _who(row):
     """Who made an attestation: its signer's username, or ``None`` if it is anonymous."""
     return row.get('signer') if row.get('signed') else None
+
+
+def ago(date, today=None):
+    """``'2026-10-28'`` as ``'3 days ago'`` (``'today'`` for today; months and years once it has been a while)."""
+    today = today or datetime.date.today()
+    days = (today - datetime.date.fromisoformat(date)).days
+    if days <= 0:
+        return 'today'
+    for unit, size in (('year', 365), ('month', 30), ('day', 1)):
+        if days >= size:
+            n = days // size
+            return f"{n} {unit}{'' if n == 1 else 's'} ago"
 
 
 def _parse_hash(spec):
@@ -97,7 +110,7 @@ def compare_hash(row, others):
     return out
 
 
-def summarize(rows, declared_hashes=()):
+def summarize(rows, declared_hashes=(), today=None):
     """The Verification card's content for the attestations ``rows`` about one node (``declared_hashes``:
     the node's own ``algo:hex`` hashes, if it declares any)."""
     rows = [r for r in rows if r['kind'] in ('hash', 'visual', 'evaluation')]
@@ -118,7 +131,7 @@ def summarize(rows, declared_hashes=()):
     for kind, kind_rows in by_kind.items():
         if kind_rows:
             newest = max(kind_rows, key=lambda r: r['record'].get('attested_at') or '')
-            latest[kind] = {'id': newest['id'], 'date': _date(newest['record'])}
+            latest[kind] = {'id': newest['id'], 'date': _date(newest['record']), 'ago': ago(_date(newest['record']), today)}
     # distinct agreeing attestations (a record is one attestation however many algorithms it carries)
     agreeing = len(by_kind['hash'])
     if conflict:
@@ -133,12 +146,18 @@ def summarize(rows, declared_hashes=()):
         status = 'none'
     else:
         status = 'attested'
+    # per kind: what this kind of attestation says about the node (hashes and inspections can find issues; scores cannot)
+    kind_status = {
+        'hash': 'none' if not by_kind['hash'] else 'issues' if conflict else 'ok',
+        'visual': 'none' if not by_kind['visual'] else 'issues' if issues else 'ok',
+        'evaluation': 'none' if not by_kind['evaluation'] else 'attested',
+    }
     label, badge, explanation = STATUSES[status]
     return {
         'total': len(rows), 'counts': {k: len(v) for k, v in by_kind.items()},
         'signed': sum(1 for r in rows if r.get('signed')),
         'status': status, 'label': label, 'badge': badge, 'explanation': explanation,
-        'hashes': hashes, 'hash_conflict': conflict, 'latest': latest, 'matches_declared': matches_declared, 'declared': bool(declared_hashes),
+        'kind_status': kind_status, 'hashes': hashes, 'hash_conflict': conflict, 'latest': latest, 'matches_declared': matches_declared, 'declared': bool(declared_hashes),
         'inspections': inspections, 'evaluations': evaluations, 'systems': systems,
         'measures': sorted({m for e in evaluations for m in e['measures']}),
     }

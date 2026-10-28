@@ -24,7 +24,7 @@
           {% if a.kind == 'identity' %}
           <div class="acq-row"><span class="acq-label">Username</span><strong>{{ a.record.username }}</strong></div>
           {% else %}
-          <div class="acq-row"><span class="acq-label">About</span><span><a href="{{ node_url(a.subject) }}">{{ node_code(a.subject) }}</a> {{ node_badge(a.subject) }} {% if node_exists(a.subject) %}<a href="{{ node_url(a.subject) }}#verification" class="ms-1 small">(its verification)</a>{% endif %}</span></div>
+          <div class="acq-row"><span class="acq-label">Subject</span><span><a href="{{ node_url(a.subject) }}">{{ node_code(a.subject) }}</a> {{ node_badge(a.subject) }}</span></div>
           {% endif %}
           <div class="acq-row"><span class="acq-label">{{ 'Registered' if a.kind == 'identity' else 'Attested' }}</span><span>{{ a.record.attested_at }}</span></div>
           {% if a.kind != 'identity' %}

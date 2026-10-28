@@ -277,41 +277,43 @@
 {% endif %}
 {% endmacro %}
 
-{# One kind's pane of the Verification card: an icon and what this kind of attestation is for, how to contribute one, then
-   the body (``caller()``): a summary of what exists, or that nothing does. #}
-{% macro _verification_pane(kind, shown, description, command) %}
-{% set look = {'hash': ('indigo', '<path d="M5 9l14 0"/><path d="M5 15l14 0"/><path d="M11 4l-4 16"/><path d="M17 4l-4 16"/>'),
-               'visual': ('teal', '<path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0"/><path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6"/>'),
-               'evaluation': ('purple', '<path d="M3 3v18h18"/><path d="M20 18v3"/><path d="M16 16v5"/><path d="M12 13v8"/><path d="M8 16v5"/><path d="M3 11c6 0 5 -5 9 -5s3 5 9 5"/>')}[kind] %}
+{# One kind's pane of the Verification card: a plain line on what it verifies, a datagrid (status, count, most recent), the
+   kind's details if it has any (``caller()``), and at the bottom, like the Installation card, the command to add one. #}
+{% macro _verification_pane(kind, shown, v, description, command) %}
+{% set status = v.kind_status[kind] %}
+{% set latest = v.latest[kind] %}
   <div data-verif-pane="{{ kind }}"{% if not shown %} hidden{% endif %}>
     <div class="card-body">
-      <div class="acq acq-attest-{{ kind }}">
-        <div class="acq-icon bg-{{ look[0] }}-lt text-{{ look[0] }}">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/>{{ look[1] | safe }}</svg>
+      <p class="mb-3">{{ description }}</p>
+      <div class="datagrid">
+        <div class="datagrid-item">
+          <div class="datagrid-title">Status</div>
+          <div class="datagrid-content">
+            {% if status == 'issues' %}<span class="text-red fw-semibold">Issues Found</span>
+            {% elif status == 'ok' %}<span class="text-green fw-semibold">No Issues Found</span>
+            {% elif status == 'attested' %}<span class="fw-semibold">Attested</span>
+            {% else %}<span class="text-secondary">Not Yet Attested</span>{% endif %}
+          </div>
         </div>
-        <div class="acq-main">
-          <div>{{ description }}</div>
-          <div class="text-secondary small">Contribute: <code class="text-break" data-copy="{{ command }}" title="click to copy" style="cursor: copy">{{ command }}</code></div>
+        <div class="datagrid-item">
+          <div class="datagrid-title">Count</div>
+          <div class="datagrid-content">{{ v.counts[kind] }}</div>
+        </div>
+        <div class="datagrid-item">
+          <div class="datagrid-title">Most Recent</div>
+          <div class="datagrid-content">{% if latest %}{{ latest.ago }} (<a href="{{ node_url(latest.id) }}">details</a>){% else %}<span class="text-secondary">&mdash;</span>{% endif %}</div>
         </div>
       </div>
+      {% set body = caller() %}
+      {% if body | trim %}<div class="border-top mt-3 pt-3">{{ body }}</div>{% endif %}
     </div>
-    <div class="card-body border-top">
-{{ caller() }}
-    </div>
+    <pre class="bg-secondary-lt p-3 overflow-auto mb-0" style="border-radius: 0"><code class="language-bash">{{ command }}</code></pre>
   </div>
 {% endmacro %}
 
-{# The body of a pane that has attestations: what they add up to, and the most recent one. ``outcome`` is its short
-   verdict ("all match"), ``good`` whether that is good news. #}
-{% macro _verification_summary(title, outcome, good, latest) %}
-      <h4 class="mb-1">{{ title }} <span class="fw-normal text-{{ 'green' if good else 'red' }}">({{ outcome }})</span></h4>
-      <div class="text-secondary">Most recent: {{ latest.date }} (<a href="{{ node_url(latest.id) }}">details</a>)</div>
-{% endmacro %}
-
 {# The Verification card, laid out like Use It: a pill for each kind of attestation that can be made about the node, with
-   how many there are, and under the chosen one what has been attested (hashes grouped by value and checked against each
-   other and the declared hash, inspections, evaluations) or that nothing has, and how to add one. A line above says how
-   well the attestations hold up. ``v`` is attestations.summarize() plus ``can_attest``. #}
+   how many there are, and under the chosen one what it verifies, its status, and how to add one. ``v`` is
+   attestations.summarize() plus ``can_attest``. #}
 {% macro verification_card(v, node) %}
 {% if v %}
 {% set name = node.qualified_name %}
@@ -326,33 +328,17 @@
     <div class="variant-pills ms-3" role="group" aria-label="Kind of attestation" data-verif-pills>
       {% for k in v.can_attest %}<button type="button" class="variant-pill{% if k == ns.shown %} active{% endif %}" data-verif="{{ k }}" aria-pressed="{{ 'true' if k == ns.shown else 'false' }}">{{ labels[k] }} <span class="pill-count">{{ v.counts[k] }}</span></button>{% endfor %}
     </div>
+    <div class="card-actions"><a href="{{ url_for('attestations') }}" class="text-secondary">about attestations</a></div>
   </div>
-  {#- "Attested" and "Not yet attested" say nothing the tabs below do not, so they get no line #}
-  {% if v.status not in ('attested', 'none') %}
-  <div class="card-body border-bottom py-2 text-secondary">
-    <strong class="text-{{ v.badge[3:-3] }}">{{ v.label }}.</strong> {{ v.explanation }}{% if v.declared and v.hashes and not v.matches_declared and v.status != 'conflict' %} None of the attested hashes use an algorithm this node declares a hash in, so they could not be checked against it.{% endif %}
-    <a href="{{ url_for('attestations') }}" class="ms-1">About attestations</a>{% if v.total %} <span class="ms-1">&middot; {{ v.total }} attestation{{ '' if v.total == 1 else 's' }}{% if v.signed %}, {{ v.signed }} signed{% endif %}</span>{% endif %}
-  </div>
-  {% endif %}
 
   {% if 'hash' in v.can_attest %}
-  {% call _verification_pane('hash', ns.shown == 'hash', 'Hash Attestation ensures ' ~ ('record-for-record' if 'visual' in v.can_attest else 'byte-for-byte') ~ ' equivalence.', 'ir_datasets attest hash ' ~ name) %}
-      {% if not v.counts.hash %}
-      <div class="text-center text-secondary py-2">No Hash Attestations</div>
-      {% else %}
-      {{ _verification_summary('Hash Attestations', 'mismatches found' if v.hash_conflict else 'all match', not v.hash_conflict, v.latest.hash) }}
-      {% endif %}
-  {% endcall %}
+  {% call _verification_pane('hash', ns.shown == 'hash', v, 'Hash attestations ensure ' ~ ('record-for-record' if 'visual' in v.can_attest else 'byte-for-byte') ~ ' equivalence.', 'ir_datasets attest hash ' ~ name) %}{% endcall %}
   {% endif %}
 
   {% if 'visual' in v.can_attest %}
-  {% call _verification_pane('visual', ns.shown == 'visual', 'Visual Attestation records that a person looked through a sample of the records.', 'ir_datasets attest visual ' ~ name ~ ' --verdict ok --sample ID1 ID2') %}
-      {% if not v.counts.visual %}
-      <div class="text-center text-secondary py-2">No Visual Attestations</div>
-      {% else %}
-      {% set problems = v.inspections | selectattr('verdict', 'equalto', 'issues') | list %}
-      {{ _verification_summary('Visual Attestations', 'issues found' if problems else 'all look right', not problems, v.latest.visual) }}
-      <div class="acq-rows acq-rows-xwide mt-3">
+  {% call _verification_pane('visual', ns.shown == 'visual', v, 'Visual attestations record that a person looked through a sample of the records.', 'ir_datasets attest visual ' ~ name ~ ' --verdict ok --sample ID1 ID2') %}
+      {% if v.inspections %}
+      <div class="acq-rows acq-rows-xwide">
         {% for i in v.inspections %}
         <div class="acq-row">
           <span class="acq-label {{ 'text-green' if i.verdict == 'ok' else 'text-orange' }}">{{ 'looks right' if i.verdict == 'ok' else 'issues' }}</span>
@@ -369,13 +355,9 @@
   {% endif %}
 
   {% if 'evaluation' in v.can_attest %}
-  {% call _verification_pane('evaluation', ns.shown == 'evaluation', 'Evaluation Attestation records the scores a system obtained on this benchmark.', 'ir_datasets attest evaluation ' ~ name ~ ' --system "NAME" -m nDCG@10=0.0') %}
-      {% if not v.counts.evaluation %}
-      <div class="text-center text-secondary py-2">No Evaluation Attestations</div>
-      {% else %}
-      <h4 class="mb-1">Evaluation Attestations <span class="fw-normal text-secondary">({{ v.systems|length }} system{{ '' if v.systems|length == 1 else 's' }})</span></h4>
-      <div class="text-secondary">Most recent: {{ v.latest.evaluation.date }} (<a href="{{ node_url(v.latest.evaluation.id) }}">details</a>)</div>
-      <div class="acq-rows acq-rows-xwide mt-3">
+  {% call _verification_pane('evaluation', ns.shown == 'evaluation', v, 'Evaluation attestations record the scores systems obtained on this benchmark.', 'ir_datasets attest evaluation ' ~ name ~ ' --system "NAME" -m nDCG@10=0.0') %}
+      {% if v.systems %}
+      <div class="acq-rows acq-rows-xwide">
         {% for sys in v.systems %}
         <div class="acq-row">
           <span class="acq-label text-body fw-semibold">{{ sys.system }}</span>

@@ -1,3 +1,4 @@
+import datetime
 import unittest
 
 from ir_datasets_site import attestations as at
@@ -37,7 +38,8 @@ class TestSummarize(unittest.TestCase):
         old['record']['attested_at'] = '2026-01-02T00:00:00Z'
         new['record']['attested_at'] = '2026-03-04T00:00:00Z'
         s = at.summarize([new, old])
-        self.assertEqual({'hash': {'id': 'new', 'date': '2026-03-04'}}, s['latest'])
+        s = at.summarize([new, old], today=datetime.date(2026, 3, 7))
+        self.assertEqual({'hash': {'id': 'new', 'date': '2026-03-04', 'ago': '3 days ago'}}, s['latest'])
         self.assertFalse(s['hash_conflict'])
 
     def test_disagreeing_hashes_conflict(self):
@@ -99,6 +101,24 @@ class TestCompareHash(unittest.TestCase):
         by_algo = {c['algo']: c for c in at.compare_hash(mine, others)}
         self.assertEqual((1, 1), (by_algo['sha256']['agree'], by_algo['sha256']['differ']))   # the table hash is not compared
         self.assertEqual((0, 0), (by_algo['md5']['agree'], by_algo['md5']['differ']))
+
+
+class TestAgo(unittest.TestCase):
+    def test_ago(self):
+        today = datetime.date(2026, 10, 28)
+        self.assertEqual(['today', '1 day ago', '9 days ago', '1 month ago', '6 months ago', '1 year ago', '2 years ago'],
+                         [at.ago(d, today) for d in ('2026-10-28', '2026-10-27', '2026-10-19', '2026-09-20', '2026-05-01', '2025-10-20', '2024-01-01')])
+        self.assertEqual('today', at.ago('2026-11-02', today))     # a clock a little ahead is not the future
+
+
+class TestKindStatus(unittest.TestCase):
+    def test_kind_status(self):
+        none = at.summarize([])['kind_status']
+        self.assertEqual({'hash': 'none', 'visual': 'none', 'evaluation': 'none'}, none)
+        s = at.summarize([hash_row(SHA_A), hash_row(SHA_B), row('visual', {'verdict': 'ok'}, 'x'),
+                          row('evaluation', {'system': 's', 'measures': {'m': 1}})])['kind_status']
+        self.assertEqual({'hash': 'issues', 'visual': 'ok', 'evaluation': 'attested'}, s)
+        self.assertEqual('issues', at.summarize([row('visual', {'verdict': 'issues'}, 'x')])['kind_status']['visual'])
 
 
 class TestKind(unittest.TestCase):
