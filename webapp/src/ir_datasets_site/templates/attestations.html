@@ -109,24 +109,6 @@ attest.for_node('irds:antique-test')                     # everything attested a
   </div>
 </div>
 
-<div class="card mb-3">
-  <div class="card-header"><h3 class="card-title">How the Verification card decides</h3></div>
-  <div class="card-body">
-    <p>Attestations are taken at face value; nothing here proves the data is right, only how well the attestations agree. A node's card shows one of these:</p>
-    <div class="mb-3">
-      {% for key, (label, badge, explanation) in statuses.items() %}
-      <div class="mb-1"><span class="badge {{ badge }}" style="min-width: 8rem">{{ label }}</span> <span class="ms-2">{{ explanation }}</span></div>
-      {% endfor %}
-    </div>
-    <ul class="mb-0">
-      <li>Hashes are grouped by <em>what</em> they hash (a file's bytes, or a table's content at one <code>hash_version</code>) and by algorithm; two attestations that hash the same thing with the same algorithm should give the same digest.</li>
-      <li>A file's hash is also checked against the hash the node itself declares, for any algorithm they have in common.</li>
-      <li>A single attestation, even a signed one, never reaches <em>Verified</em> on its own unless it matches the declared hash.</li>
-      <li>A signature says <em>who</em> made an attestation, checked by the server when it was received. It is not an endorsement.</li>
-    </ul>
-  </div>
-</div>
-
 {% if overview.recent %}
 <div class="card mb-3">
   <div class="card-header"><h3 class="card-title">Recent attestations</h3><div class="card-actions text-secondary">{{ '{:,}'.format(overview.total) }} in all</div></div>
