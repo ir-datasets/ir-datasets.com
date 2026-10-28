@@ -37,7 +37,7 @@ class ServerCase(unittest.TestCase):
 
 class TestReading(ServerCase):
     def test_anonymous_roundtrip(self):
-        id = self.client.submit('hash', 'irds:antique-docs', HASH)
+        id = self.client.submit('hash', 'irds:antique-docs', HASH, identity=None)
         self.assertEqual([id], self.client.ids())
         [row] = self.client.get(id, 'no-such-id')
         self.assertEqual(('hash', 'irds:antique-docs', None, False),
@@ -48,7 +48,7 @@ class TestReading(ServerCase):
         self.assertRefused(404, self.client._call, 'GET', 'no-such-id')
 
     def test_incremental_listing(self):
-        ids = [self.client.submit('hash', f'irds:d{i}', HASH) for i in range(3)]
+        ids = [self.client.submit('hash', f'irds:d{i}', HASH, identity=None) for i in range(3)]
         rows = list(self.client.records())
         self.assertEqual(ids, [r['id'] for r in rows])
         self.assertEqual(ids[2:], [r['id'] for r in self.client.records(after=rows[1]['seq'])])
@@ -95,9 +95,21 @@ class TestSubmitting(ServerCase):
         self.assertRefused(422, self.post, 'register',
                            {'record': record, 'signature': crypto.sign(other, records.signing_payload(record))})
 
+    def test_the_saved_identity_signs_by_default(self):
+        before = self.client.submit('hash', 'irds:antique-docs', HASH)
+        self.assertIsNone(self.client.get(before)[0]['signed_by'])            # nothing saved yet: anonymous
+        me = self.client.register('dana')
+        signed = self.client.submit('hash', 'irds:antique-docs', HASH)
+        self.assertEqual(me.identity_id, self.client.get(signed)[0]['signed_by'])
+        anonymous = self.client.submit('hash', 'irds:antique-docs', HASH, identity=None)
+        self.assertIsNone(self.client.get(anonymous)[0]['signed_by'])         # asking for anonymous is respected
+        elsewhere = crypto.Identity('dana', me.private_key, me.public_key, me.identity_id, server='http://elsewhere.example')
+        elsewhere.save()
+        self.assertIsNone(self.client.get(self.client.submit('hash', 'irds:antique-docs', HASH))[0]['signed_by'])   # saved for another server
+
     def test_visual_needs_signature(self):
         record = {'verdict': 'ok', 'sample': ['1'], 'notes': ''}
-        self.assertRefused(422, self.client.submit, 'visual', 'irds:antique-docs', record)
+        self.assertRefused(422, self.client.submit, 'visual', 'irds:antique-docs', record, identity=None)
         self.client.register('bob')
         id = attest_visual('irds:antique-docs', 'ok', sample=['1'], client=self.client)
         self.assertTrue(self.client.get(id)[0]['verified'])
@@ -115,7 +127,7 @@ class TestDeleting(ServerCase):
         self.bob = self.client.register('bob')
         self.mine = self.client.submit('hash', 'irds:antique-docs', HASH, self.alice)
         self.theirs = self.client.submit('hash', 'irds:antique-docs', HASH, self.bob)
-        self.anon = self.client.submit('hash', 'irds:antique-docs', HASH)
+        self.anon = self.client.submit('hash', 'irds:antique-docs', HASH, identity=None)
 
     def request(self, target, identity, **changes):
         """A deletion request for ``target`` signed by ``identity``, the way the client builds one."""
