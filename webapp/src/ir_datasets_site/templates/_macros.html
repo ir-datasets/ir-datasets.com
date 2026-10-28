@@ -277,96 +277,110 @@
 {% endif %}
 {% endmacro %}
 
-{# The heading of one kind's section of the Verification card. #}
-{% macro _verification_heading(title, count, blurb) %}
-  <div class="card-body pb-2 border-top">
-    <div class="d-flex align-items-baseline"><h4 class="mb-0">{{ title }}</h4><span class="text-secondary ms-2">{{ count }} attestation{{ '' if count == 1 else 's' }}</span></div>
-    <div class="text-secondary mt-1">{{ blurb }}</div>
-  </div>
+{# One kind's block of the Verification card, in the same layout as a node's Overview box: an icon chip, a title with the
+   number of attestations, a one-line explanation, then label/value rows (``caller()`` writes them). #}
+{% macro _verification_block(kind, title, count, blurb) %}
+{% set look = {'hash': ('indigo', '<path d="M5 9l14 0"/><path d="M5 15l14 0"/><path d="M11 4l-4 16"/><path d="M17 4l-4 16"/>'),
+               'visual': ('teal', '<path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0"/><path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6"/>'),
+               'evaluation': ('purple', '<path d="M3 3v18h18"/><path d="M20 18v3"/><path d="M16 16v5"/><path d="M12 13v8"/><path d="M8 16v5"/><path d="M3 11c6 0 5 -5 9 -5s3 5 9 5"/>')}[kind] %}
+    <div class="acq acq-attest-{{ kind }}">
+      <div class="acq-icon bg-{{ look[0] }}-lt text-{{ look[0] }}">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/>{{ look[1] | safe }}</svg>
+      </div>
+      <div class="acq-main">
+        <div class="acq-title">{{ title }}<span class="badge badge-sm bg-secondary-lt ms-2" style="position:relative;top:-1px">{{ count }}</span></div>
+        <div class="acq-sub mb-1">{{ blurb }}</div>
+        <div class="acq-rows acq-rows-xwide">
+{{ caller() }}
+        </div>
+      </div>
+    </div>
 {% endmacro %}
 
-{# How to add one: the command, copied on click. #}
+{# The row that says how to add one: the command, copied on click. #}
 {% macro _verification_add(command) %}
-  <div class="card-body pt-2 text-secondary small">Add one: <code data-copy="{{ command }}" title="click to copy" style="cursor: copy">{{ command }}</code></div>
+          <div class="acq-row"><span class="acq-label">Add yours</span><code class="text-break" data-copy="{{ command }}" title="click to copy" style="cursor: copy">{{ command }}</code></div>
 {% endmacro %}
 
-{# The Verification card: for each kind of attestation that can be made about the node, what has been attested
-   (hashes grouped by value and checked against each other and the declared hash, inspections, evaluations), or
-   that nothing has, and how to add one. ``v`` is attestations.summarize() plus ``can_attest``. #}
+{# The Verification card, in the style of a node's Overview box: first how well the attestations hold up, then a block for
+   each kind of attestation that can be made about the node -- what has been attested (hashes grouped by value and checked
+   against each other and the declared hash, inspections, evaluations), or that nothing has, and how to add one.
+   ``v`` is attestations.summarize() plus ``can_attest``. #}
 {% macro verification_card(v, node) %}
 {% if v %}
 {% set name = node.qualified_name %}
+{% set color = v.badge[3:-3] %}
 <div class="card mt-3 spy-target" id="verification">
-  <div class="card-header">
-    <h3 class="card-title">Verification</h3>
-    <span class="badge {{ v.badge }} ms-2">{{ v.label }}</span>
-    <div class="card-actions text-secondary">{% if v.total %}{{ v.total }} attestation{{ '' if v.total == 1 else 's' }}{% if v.signed %} &middot; {{ v.signed }} signed{% endif %} &middot; {% endif %}<a href="{{ url_for('attestations') }}">about attestations</a></div>
-  </div>
   <div class="card-body">
-    <p class="text-secondary mb-0">{{ v.explanation }}{% if v.declared and v.hashes and not v.matches_declared and v.status != 'conflict' %} None of the attested hashes use an algorithm this node declares a hash in, so they could not be checked against it.{% endif %}</p>
-  </div>
-
-  {% if 'hash' in v.can_attest %}
-  {{ _verification_heading('Hashes', v.counts.hash, 'What people got when they hashed it. Attestations that agree mean everyone is working from the same data.') }}
-  {% if v.hashes %}
-  <div class="list-group list-group-flush">
-    {% for h in v.hashes %}
-    <div class="list-group-item">
-      <div class="d-flex flex-wrap align-items-center gap-2">
-        <code>{{ h.algo }}</code><span class="text-secondary">of the {{ h.scope }}</span>{{ short_digest(h.digest, 24) }}
-        {% if h.matches_declared == true %}<span class="badge badge-sm bg-green-lt">matches the declared hash</span>{% elif h.matches_declared == false %}<span class="badge badge-sm bg-red-lt">differs from the declared hash</span>{% endif %}
-        {% if h.disagrees %}<span class="badge badge-sm bg-red-lt">disagrees with another attestation</span>{% elif h.count > 1 %}<span class="badge badge-sm bg-green-lt">{{ h.count }} agree</span>{% endif %}
+    <div class="acq acq-attest-status">
+      <div class="acq-icon bg-{{ color }}-lt text-{{ color }}">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M11.46 20.846a12 12 0 0 1 -7.96 -14.846a12 12 0 0 0 8.5 -3a12 12 0 0 0 8.5 3a12 12 0 0 1 -.09 7.06"/><path d="M15 19l2 2l4 -4"/></svg>
       </div>
-      <div class="text-secondary small mt-1">{{ h.count }} attestation{{ '' if h.count == 1 else 's' }}{% if h.signers %} &middot; {{ h.signers|join(', ') }}{% endif %}{% if h.anonymous %} &middot; {{ h.anonymous }} anonymous{% endif %}{% for src in h.sources %} &middot; from <span class="text-break">{{ src }}</span>{% endfor %}</div>
-    </div>
-    {% endfor %}
-  </div>
-  {% else %}
-  <div class="card-body py-2 text-secondary">No hashes attested yet.</div>
-  {% endif %}
-  {{ _verification_add('ir_datasets attest hash ' ~ name) }}
-  {% endif %}
-
-  {% if 'visual' in v.can_attest %}
-  {{ _verification_heading('Inspections', v.counts.visual, 'Someone looked through a sample of the records and either they looked right or they found problems. Always signed.') }}
-  {% if v.inspections %}
-  <div class="list-group list-group-flush">
-    {% for i in v.inspections %}
-    <div class="list-group-item">
-      <span class="badge badge-sm {{ 'bg-green-lt' if i.verdict == 'ok' else 'bg-orange-lt' }}">{{ 'looks right' if i.verdict == 'ok' else 'issues' }}</span>
-      <strong class="ms-1">{{ i.who or 'anonymous' }}</strong>
-      <span class="text-secondary">&middot; {{ i.date }}{% if i.sample %} &middot; {{ i.sample }} record{{ '' if i.sample == 1 else 's' }} checked{% endif %}</span>
-      {% if i.notes %}<div class="mt-1">{{ i.notes }}</div>{% endif %}
-    </div>
-    {% endfor %}
-  </div>
-  {% else %}
-  <div class="card-body py-2 text-secondary">Nobody has inspected it yet.</div>
-  {% endif %}
-  {{ _verification_add('ir_datasets attest visual ' ~ name ~ ' --verdict ok --sample ID1 ID2') }}
-  {% endif %}
-
-  {% if 'evaluation' in v.can_attest %}
-  {{ _verification_heading('Evaluations', v.counts.evaluation, 'Scores systems obtained on this benchmark. A benchmark whose scores do not reproduce often has a problem with its documents, queries or judgments.') }}
-  {% if v.systems %}
-  <div class="list-group list-group-flush">
-    {% for sys in v.systems %}
-    <div class="list-group-item">
-      <strong>{{ sys.system }}</strong>
-      {% for e in sys.entries %}
-      <div class="d-flex flex-wrap align-items-center gap-2 mt-1">
-        {% for k, val in e.measures.items() %}<span class="badge bg-secondary-lt">{{ k }} <strong>{{ '%.4g'|format(val) }}</strong></span>{% endfor %}
-        <span class="text-secondary small">{{ e.who or 'anonymous' }} &middot; {{ e.date }}</span>
+      <div class="acq-main">
+        <div class="acq-title">Verification<span class="badge badge-sm {{ v.badge }} ms-2" style="position:relative;top:-1px">{{ v.label }}</span></div>
+        <div class="acq-sub">{{ v.explanation }}{% if v.declared and v.hashes and not v.matches_declared and v.status != 'conflict' %} None of the attested hashes use an algorithm this node declares a hash in, so they could not be checked against it.{% endif %}</div>
+        <div class="acq-rows acq-rows-xwide mt-1">
+          {% if v.total %}<div class="acq-row"><span class="acq-label">Attestations</span><span>{{ v.total }}{% if v.signed %} <span class="text-secondary">&middot; {{ v.signed }} signed</span>{% endif %}</span></div>{% endif %}
+          <div class="acq-row"><span class="acq-label">Learn more</span><a href="{{ url_for('attestations') }}">About attestations</a></div>
+        </div>
       </div>
-      {% endfor %}
     </div>
-    {% endfor %}
+
+    {% if 'hash' in v.can_attest %}
+    {% call _verification_block('hash', 'Hashes', v.counts.hash, 'What people got when they hashed it. Attestations that agree mean everyone is working from the same data.') %}
+          {% for h in v.hashes %}
+          <div class="acq-row">
+            <span class="acq-label"><code>{{ h.algo }}</code> of the {{ h.scope }}</span>
+            <span>
+              <code class="text-break" data-copy="{{ h.digest }}" title="click to copy" style="cursor: copy">{{ h.digest }}</code>
+              {% if h.matches_declared == true %}<span class="badge badge-sm bg-green-lt ms-1">matches the declared hash</span>{% elif h.matches_declared == false %}<span class="badge badge-sm bg-red-lt ms-1">differs from the declared hash</span>{% endif %}
+              {% if h.disagrees %}<span class="badge badge-sm bg-red-lt ms-1">disagrees with another attestation</span>{% elif h.count > 1 %}<span class="badge badge-sm bg-green-lt ms-1">{{ h.count }} agree</span>{% endif %}
+              <div class="text-secondary small">{{ h.count }} attestation{{ '' if h.count == 1 else 's' }}{% if h.signers %} &middot; {{ h.signers|join(', ') }}{% endif %}{% if h.anonymous %} &middot; {{ h.anonymous }} anonymous{% endif %}{% for src in h.sources %} &middot; from <span class="text-break">{{ src }}</span>{% endfor %}</div>
+            </span>
+          </div>
+          {% else %}
+          <div class="text-secondary">No hashes attested yet.</div>
+          {% endfor %}
+          {{ _verification_add('ir_datasets attest hash ' ~ name) }}
+    {% endcall %}
+    {% endif %}
+
+    {% if 'visual' in v.can_attest %}
+    {% call _verification_block('visual', 'Inspections', v.counts.visual, 'Someone looked through a sample of the records and either they looked right or they found problems. Always signed.') %}
+          {% for i in v.inspections %}
+          <div class="acq-row">
+            <span class="acq-label"><span class="badge badge-sm {{ 'bg-green-lt' if i.verdict == 'ok' else 'bg-orange-lt' }}">{{ 'looks right' if i.verdict == 'ok' else 'issues' }}</span></span>
+            <span>
+              <strong>{{ i.who or 'anonymous' }}</strong>
+              <span class="text-secondary">&middot; {{ i.date }}{% if i.sample %} &middot; {{ i.sample }} record{{ '' if i.sample == 1 else 's' }} checked{% endif %}</span>
+              {% if i.notes %}<div>{{ i.notes }}</div>{% endif %}
+            </span>
+          </div>
+          {% else %}
+          <div class="text-secondary">Nobody has inspected it yet.</div>
+          {% endfor %}
+          {{ _verification_add('ir_datasets attest visual ' ~ name ~ ' --verdict ok --sample ID1 ID2') }}
+    {% endcall %}
+    {% endif %}
+
+    {% if 'evaluation' in v.can_attest %}
+    {% call _verification_block('evaluation', 'Evaluations', v.counts.evaluation, 'Scores systems obtained on this benchmark. A benchmark whose scores do not reproduce often has a problem with its documents, queries or judgments.') %}
+          {% for sys in v.systems %}
+          <div class="acq-row">
+            <span class="acq-label text-body fw-semibold">{{ sys.system }}</span>
+            <span>
+              {% for e in sys.entries %}
+              <div>{% for k, val in e.measures.items() %}<span class="badge bg-secondary-lt me-1">{{ k }} <strong>{{ '%.4g'|format(val) }}</strong></span>{% endfor %} <span class="text-secondary small">{{ e.who or 'anonymous' }} &middot; {{ e.date }}</span></div>
+              {% endfor %}
+            </span>
+          </div>
+          {% else %}
+          <div class="text-secondary">No scores reported yet.</div>
+          {% endfor %}
+          {{ _verification_add('ir_datasets attest evaluation ' ~ name ~ ' --system "NAME" -m nDCG@10=0.0') }}
+    {% endcall %}
+    {% endif %}
   </div>
-  {% else %}
-  <div class="card-body py-2 text-secondary">No scores reported yet.</div>
-  {% endif %}
-  {{ _verification_add('ir_datasets attest evaluation ' ~ name ~ ' --system "NAME" -m nDCG@10=0.0') }}
-  {% endif %}
 </div>
 {% endif %}
 {% endmacro %}

@@ -310,6 +310,8 @@ pre code.hljs { background: transparent; padding: 0; }
 /* rows whose labels are longer than the default 4.3rem column (e.g. "scoreddocs") */
 @media (min-width: 576px) {
   .acq-rows-wide .acq-row { grid-template-columns: 6rem minmax(0, 1fr); }
+  /* the Verification card: labels are an algorithm and what it hashed, a system name, a verdict */
+  .acq-rows-xwide .acq-row { grid-template-columns: 9rem minmax(0, 1fr); }
 }
 
 /* Inline type badges (next to a node name in lists, /search, /provider/<prefix>)
