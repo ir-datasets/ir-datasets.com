@@ -60,8 +60,8 @@ inside the installed package -- override with `--out`/`--store` or the
 `/attestations` explains the four kinds of attestation (`attest:` nodes, held by the server in
 [`../attest`](../attest) and part of the graph once built with the `attest` provider) and lists the recent ones.
 Every file, table and benchmark gets a **Verification** card below *Use It* (and an Overview row linking to it), even
-when nothing has been attested: a section for each kind of attestation that can be made about that node (hashes for
-files and tables, inspections for tables, evaluations for benchmarks), each summarizing what exists (hashes grouped by
+when nothing has been attested. Like *Use It* it has a tab for each kind of attestation that can be made about that node
+(hashes for files and tables, inspections for tables, evaluations for benchmarks), each showing its count and summarizing what exists (hashes grouped by
 what they hash and algorithm and checked against each other and the node's declared hash) or saying there is nothing yet,
 with the command to add one. How a status is decided is in `attestations.py`
 (pure functions, tested by `python -m unittest discover -s tests`). The card reflects the attestations at

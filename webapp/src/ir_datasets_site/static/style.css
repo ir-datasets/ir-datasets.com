@@ -392,6 +392,7 @@ h2 > .badge.badge-sm { top: -2px; }
 }
 .variant-pill:hover { background: var(--tblr-bg-surface-secondary, rgba(0,0,0,.05)); }
 .variant-pill.active { color: #fff; background: var(--tblr-primary, #4f86e8); border-color: var(--tblr-primary, #4f86e8); }
+.variant-pill .pill-count { margin-left: .25rem; opacity: .7; font-variant-numeric: tabular-nums; }
 
 /* A node's Markdown summary: tables and lists read like the rest of the page. */
 .markdown table { border-collapse: separate; border-spacing: 0; margin: 0 0 1rem;
