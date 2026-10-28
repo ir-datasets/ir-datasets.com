@@ -313,10 +313,13 @@
       {% for k in v.can_attest %}<button type="button" class="variant-pill{% if k == ns.shown %} active{% endif %}" data-verif="{{ k }}" aria-pressed="{{ 'true' if k == ns.shown else 'false' }}">{{ labels[k] }} <span class="pill-count">{{ v.counts[k] }}</span></button>{% endfor %}
     </div>
   </div>
+  {#- "Attested" and "Not yet attested" say nothing the tabs below do not, so they get no line #}
+  {% if v.status not in ('attested', 'none') %}
   <div class="card-body border-bottom py-2 text-secondary">
     <strong class="text-{{ v.badge[3:-3] }}">{{ v.label }}.</strong> {{ v.explanation }}{% if v.declared and v.hashes and not v.matches_declared and v.status != 'conflict' %} None of the attested hashes use an algorithm this node declares a hash in, so they could not be checked against it.{% endif %}
     <a href="{{ url_for('attestations') }}" class="ms-1">About attestations</a>{% if v.total %} <span class="ms-1">&middot; {{ v.total }} attestation{{ '' if v.total == 1 else 's' }}{% if v.signed %}, {{ v.signed }} signed{% endif %}</span>{% endif %}
   </div>
+  {% endif %}
 
   {% if 'hash' in v.can_attest %}
   {% call _verification_pane('hash', ns.shown == 'hash', 'What people got when they hashed it. Attestations that agree mean everyone is working from the same data.') %}
