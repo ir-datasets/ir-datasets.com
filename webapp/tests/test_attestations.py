@@ -31,8 +31,18 @@ class TestSummarize(unittest.TestCase):
         [h] = s['hashes']
         self.assertEqual((2, ['alice'], 1), (h['count'], h['signers'], h['anonymous']))
 
+    def test_latest_attestation_per_kind(self):
+        old, new = hash_row(SHA_A), hash_row(SHA_A)
+        old['id'], new['id'] = 'old', 'new'
+        old['record']['attested_at'] = '2026-01-02T00:00:00Z'
+        new['record']['attested_at'] = '2026-03-04T00:00:00Z'
+        s = at.summarize([new, old])
+        self.assertEqual({'hash': {'id': 'new', 'date': '2026-03-04'}}, s['latest'])
+        self.assertFalse(s['hash_conflict'])
+
     def test_disagreeing_hashes_conflict(self):
         s = at.summarize([hash_row(SHA_A), hash_row(SHA_B), hash_row(SHA_B)])
+        self.assertTrue(s['hash_conflict'])
         self.assertEqual('conflict', s['status'])
         self.assertEqual([2, 1], [h['count'] for h in s['hashes']])      # the common one first
         self.assertTrue(all(h['disagrees'] for h in s['hashes']))

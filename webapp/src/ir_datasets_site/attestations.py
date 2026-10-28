@@ -92,6 +92,11 @@ def summarize(rows, declared_hashes=()):
     systems = [{'system': system, 'entries': list(group)}
                for system, group in itertools.groupby(entries, key=lambda e: e['system'])]
     issues = [v for v in inspections if v['verdict'] == 'issues']
+    latest = {}
+    for kind, kind_rows in by_kind.items():
+        if kind_rows:
+            newest = max(kind_rows, key=lambda r: r['record'].get('attested_at') or '')
+            latest[kind] = {'id': newest['id'], 'date': _date(newest['record'])}
     # distinct agreeing attestations (a record is one attestation however many algorithms it carries)
     agreeing = len(by_kind['hash'])
     if conflict:
@@ -111,7 +116,7 @@ def summarize(rows, declared_hashes=()):
         'total': len(rows), 'counts': {k: len(v) for k, v in by_kind.items()},
         'signed': sum(1 for r in rows if r.get('signed')),
         'status': status, 'label': label, 'badge': badge, 'explanation': explanation,
-        'hashes': hashes, 'matches_declared': matches_declared, 'declared': bool(declared_hashes),
+        'hashes': hashes, 'hash_conflict': conflict, 'latest': latest, 'matches_declared': matches_declared, 'declared': bool(declared_hashes),
         'inspections': inspections, 'evaluations': evaluations, 'systems': systems,
         'measures': sorted({m for e in evaluations for m in e['measures']}),
     }
