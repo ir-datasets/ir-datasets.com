@@ -29,6 +29,7 @@ import pyoxigraph as ox
 from markupsafe import Markup, escape
 from flask import Flask, abort, jsonify, redirect, render_template, request, send_file, url_for
 
+from . import attestations as attest_summary
 from . import graph_queries as gq
 from ir_datasets.v2 import requirements as v2_requirements
 from ir_datasets.v2.vocabulary import protocol_of as vocabulary_protocol_of
@@ -1027,6 +1028,32 @@ def class_page(qualified):
         rows=[_row_dict(name, ts) for name, ts in rows], total=total, shown=len(rows))
 
 
+def _verification(node, qualified):
+    """The Verification card's content for a node, or ``None`` if nothing has been attested about it
+    (or it isn't in the store, like a live-fallback ``hf:`` node)."""
+    if not isinstance(node, gq.NodeView):
+        return None
+    rows = gq.attestations_of(store, qualified)
+    if not rows:
+        return None
+    summary = attest_summary.summarize(rows, node.metadata.get('fileHash') or ())
+    # what a visitor could add: hashes for data and tables, a visual check for tables, scores for a benchmark
+    types = node.types
+    summary['can_attest'] = (['hash'] if any(v2.is_subclass(t, v2.DATA) or v2.is_subclass(t, v2.TABLE) for t in types) else []) \
+        + (['visual'] if any(v2.is_subclass(t, v2.TABLE) for t in types) else []) \
+        + (['evaluation'] if any(v2.is_subclass(t, v2.BENCHMARK) and not v2.is_subclass(t, v2.SUITE) for t in types) else [])
+    return summary
+
+
+@app.route('/attestations')
+def attestations():
+    """What attestations are, the four kinds and their record shapes, how to submit one, and what has
+    been attested so far."""
+    rows = gq.all_attestations(store)
+    return render_template('attestations.html', overview=attest_summary.overview(rows),
+                           statuses=attest_summary.STATUSES)
+
+
 @app.route('/provider/<prefix>')
 def provider(prefix):
     """No provider-filter checkboxes here (unlike the home page) -- each
@@ -1485,7 +1512,7 @@ def node(qualified):
             derived.append({'name': subject, 'type': o.type if o else None})
     related = _related(n, triples)
     return render_template(
-        template, node=n, frozen=frozen, triples=triples, raw_triples=raw_triples, raw_total=raw_total,
+        template, node=n, verification=_verification(n, qualified), frozen=frozen, triples=triples, raw_triples=raw_triples, raw_total=raw_total,
         requires=requires, install_hint=v2_requirements.install_hint(requires) if requires else None,
         package=package,
         derived=derived,

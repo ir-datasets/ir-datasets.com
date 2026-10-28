@@ -9,6 +9,7 @@
 {% endfor %}
 {% set sections = [('overview', 'Overview')]
   + ([('related', 'Related Nodes')] if derived or validates else [])
+  + ([('verification', 'Verification')] if verification else [])
   + [('use-it', 'Use It')]
   + [('raw-triples', 'Raw Triples')] %}
 {% set sections = with_about(sections, node) %}
@@ -27,6 +28,7 @@
           {% if node.metadata.fileSize %}<div class="acq-row"><span class="acq-label">Size</span><span>{{ node.metadata.fileSize | human_size }}</span></div>{% endif %}
 {{ m.citation_row(node) }}
 {{ m.license_row(node) }}
+{{ m.verification_row(verification) }}
           {% if node.metadata.dua %}<div class="acq-row"><span class="acq-label">DUA</span><span>{{ node.metadata.dua }}</span></div>{% endif %}
         </div>
       </div>
@@ -185,6 +187,8 @@
   </div>
 </div>
 {% endif %}
+
+{{ m.verification_card(verification, node) }}
 
 {{ m.use_it_section(snippet, package=package, requires=requires, variants=snippet_variants) }}
 

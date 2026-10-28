@@ -26,7 +26,7 @@
     <p class="ms-4"><a href="{{ url_for('search', type='irds:Table') }}" class="badge badge-cat-table" style="position: relative; top: 1px">Tables</a> parse <strong class="text-cat-resource">Data</strong> into records with a consistent structure. Examples: <a href="{{ node_url('irds:msmarco-passage') }}">{{ node_code('irds:msmarco-passage') }}</a> {{ node_badge('irds:msmarco-passage') }} and <a href="{{ node_url('irds:trec-dl-2019-passage-qrels') }}">{{ node_code('irds:trec-dl-2019-passage-qrels') }}</a> {{ node_badge('irds:trec-dl-2019-passage-qrels') }}</p>
     <p class="ms-4"><a href="{{ url_for('search', type='irds:Bundle') }}" class="badge badge-cat-bundle" style="position: relative; top: 1px">Bundles</a> are collections of <strong class="text-cat-table">Tables</strong> and other <strong class="text-cat-bundle">Bundles</strong>. Examples: <a href="{{ node_url('irds:antique-test') }}">{{ node_code('irds:antique-test') }}</a> {{ node_badge('irds:antique-test') }} and <a href="{{ node_url('irds:bright') }}">{{ node_code('irds:bright') }}</a> {{ node_badge('irds:bright') }}</p>
 
-    <p>See all <a href="{{ url_for('classes') }}">classes</a> and <a href="{{ url_for('properties') }}">properties</a> of the graph, each with a description.</p>
+    <p>See all <a href="{{ url_for('classes') }}">classes</a> and <a href="{{ url_for('properties') }}">properties</a> of the graph, each with a description, and how people <a href="{{ url_for('attestations') }}">attest</a> to the data being right.</p>
 
     <p class="mb-0">Providers: {% for prefix in providers %}<a href="{{ url_for('provider', prefix=prefix) }}"><code>{{ prefix }}</code></a>{% if not loop.last %}, {% endif %}{% endfor %}</p>
   </div>

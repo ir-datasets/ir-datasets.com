@@ -124,6 +124,7 @@ def build(out='dist', providers=None):
       branch (rendered directly, not through the live ``/search`` route,
       since that route always passes ``rows=None`` -- see app.py's
       ``search()``).
+    * ``/attestations``, the page about attestations,
     * ``/classes`` and ``/id/<class>`` for every known graph class, and
       ``/properties`` and ``/id/<property>`` for every declared graph property.
     * ``/provider/<prefix>`` for every provider in ``providers`` -- same
@@ -196,6 +197,7 @@ def build(out='dist', providers=None):
         # classes()/class_page() and properties()/property_page()).
         type_urls = ['/classes'] + [_node_url(t) for t in sorted(_type_graph()[0])]
         type_urls += ['/properties'] + [_node_url(q) for q in sorted(v2.graph_properties())]
+        type_urls += ['/attestations']
 
     with app.test_client() as client:
         for name, url in tqdm(node_urls, desc='node pages', unit='page'):

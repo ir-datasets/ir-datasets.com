@@ -3,7 +3,7 @@
 {% block title %}{{ node.qualified_name }} &mdash; ir-datasets.com{% endblock %}
 {% block content %}
 
-{% set sections = [('overview', 'Overview'), ('related', 'Related Nodes'), ('use-it', 'Use It'), ('raw-triples', 'Raw Triples')] %}
+{% set sections = [('overview', 'Overview'), ('related', 'Related Nodes')] + ([('verification', 'Verification')] if verification else []) + [('use-it', 'Use It'), ('raw-triples', 'Raw Triples')] %}
 {% set sections = with_about(sections, node) %}
 {% call m.spy_layout(sections, node) %}
 <div class="card spy-target" id="overview">
@@ -18,6 +18,7 @@
           {% if node.metadata.metric %}<div class="acq-row"><span class="acq-label">Measures</span><span>{% for m in node.metadata.metric %}<code>{{ m }}</code>{% if not loop.last %}, {% endif %}{% endfor %}</span></div>{% endif %}
 {{ m.citation_row(node) }}
 {{ m.license_row(node) }}
+{{ m.verification_row(verification) }}
         </div>
       </div>
     </div>
@@ -82,6 +83,8 @@
    node.derived_from/node.filter here would describe a relationship with no
    backing edge; that provenance is instead visible on the derived facet's own
    page (follow a table link below), via a real edge. #}
+
+{{ m.verification_card(verification, node) }}
 
 {{ m.use_it_section(snippet, snippet_config, package=package, requires=requires, variants=snippet_variants) }}
 

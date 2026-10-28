@@ -1,0 +1,120 @@
+"""What the site says about attestations: turning the attestation records about a node into the
+summary its Verification card shows. Pure functions over plain dicts, so no Flask and no graph
+store is needed to test them.
+
+An attestation row is ``{'id', 'kind', 'subject', 'record', 'signed', 'verified', 'signer'}`` where ``kind`` is
+``hash``/``visual``/``evaluation``/``identity``, ``record`` the record's JSON, ``signed`` whether it
+has a signature, ``verified`` whether the server checked that signature on receipt, and ``signer``
+the signing identity's username (or ``None``).
+"""
+import collections
+
+KINDS = ('hash', 'visual', 'evaluation', 'identity')
+
+#: Overall status, most important first. ``verified`` needs agreement among more than one
+#: attestation, or one that matches the hash the node declares: a single anonymous hash proves little.
+STATUSES = {
+    'conflict': ('Hash conflict', 'bg-red-lt', 'Attestations disagree about the data, or differ from the hash the node declares.'),
+    'issues': ('Issues reported', 'bg-orange-lt', 'Someone who inspected the data reported problems.'),
+    'verified': ('Verified', 'bg-green-lt', 'Hash attestations agree with each other or with the declared hash.'),
+    'evaluated': ('Evaluated', 'bg-azure-lt', 'Systems have reported scores on this benchmark; compare them with your own runs.'),
+    'attested': ('Attested', 'bg-secondary-lt', 'Attested, but not enough to cross-check against anything.'),
+}
+
+
+def kind_of(type_name):
+    """``'attest:HashAttestation'`` -> ``'hash'``."""
+    local = type_name.split(':', 1)[-1]
+    kind = local[:-len('Attestation')].lower() if local.endswith('Attestation') else local.lower()
+    return kind if kind in KINDS else None
+
+
+def _date(record):
+    return (record.get('attested_at') or '')[:10]
+
+
+def _who(row):
+    """Who made an attestation: its signer's username, or ``None`` if it is anonymous."""
+    return row.get('signer') if row.get('signed') else None
+
+
+def _parse_hash(spec):
+    algo, _, digest = str(spec).partition(':')
+    return algo.lower(), digest.lower()
+
+
+def _hash_groups(rows, declared):
+    """Group hash attestations by what they hash (a file's bytes, or a table's content at one
+    ``hash_version``) and algorithm, then by digest. A (scope, algo) with several digests is a
+    conflict; a digest differing from the node's declared one for that algorithm is too."""
+    scopes = collections.OrderedDict()      # (scope, algo) -> digest -> [rows]
+    for row in rows:
+        record = row['record']
+        scope = f"table v{record['hash_version']}" if 'hash_version' in record else 'file'
+        for spec in record.get('hashes') or []:
+            algo, digest = _parse_hash(spec)
+            scopes.setdefault((scope, algo), collections.OrderedDict()).setdefault(digest, []).append(row)
+    declared = dict(_parse_hash(d) for d in declared or ())
+    out, conflict = [], False
+    for (scope, algo), digests in sorted(scopes.items()):
+        # a file's declared hash applies to the file's bytes, not to a table's content
+        expected = declared.get(algo) if scope == 'file' else None
+        disagree = len(digests) > 1
+        for digest, hashed_by in sorted(digests.items(), key=lambda kv: -len(kv[1])):
+            matches = None if expected is None else digest == expected
+            conflict = conflict or disagree or matches is False
+            out.append({
+                'scope': scope, 'algo': algo, 'digest': digest, 'count': len(hashed_by),
+                'signers': sorted({_who(r) for r in hashed_by if _who(r)}),
+                'anonymous': sum(1 for r in hashed_by if not r.get('signed')),
+                'sources': sorted({r['record'].get('source') for r in hashed_by if r['record'].get('source')}),
+                'matches_declared': matches, 'disagrees': disagree,
+            })
+    return out, conflict, bool(declared) and any(g['matches_declared'] for g in out)
+
+
+def summarize(rows, declared_hashes=()):
+    """The Verification card's content for the attestations ``rows`` about one node (``declared_hashes``:
+    the node's own ``algo:hex`` hashes, if it declares any)."""
+    rows = [r for r in rows if r['kind'] in ('hash', 'visual', 'evaluation')]
+    by_kind = {k: [r for r in rows if r['kind'] == k] for k in ('hash', 'visual', 'evaluation')}
+    hashes, conflict, matches_declared = _hash_groups(by_kind['hash'], declared_hashes)
+    inspections = sorted(({'who': _who(r), 'verdict': r['record'].get('verdict'),
+                           'notes': r['record'].get('notes') or '', 'sample': len(r['record'].get('sample') or []),
+                           'date': _date(r['record']), 'id': r['id']} for r in by_kind['visual']),
+                         key=lambda v: (v['verdict'] != 'issues', v['date']))
+    evaluations = sorted(({'system': r['record'].get('system'), 'measures': r['record'].get('measures') or {},
+                           'who': _who(r), 'date': _date(r['record']), 'id': r['id']} for r in by_kind['evaluation']),
+                         key=lambda e: (e['system'] or '', e['date']))
+    issues = [v for v in inspections if v['verdict'] == 'issues']
+    # distinct agreeing attestations (a record is one attestation however many algorithms it carries)
+    agreeing = len(by_kind['hash'])
+    if conflict:
+        status = 'conflict'
+    elif issues:
+        status = 'issues'
+    elif by_kind['hash'] and (agreeing >= 2 or matches_declared):
+        status = 'verified'
+    elif evaluations and not by_kind['hash'] and not by_kind['visual']:
+        status = 'evaluated'
+    else:
+        status = 'attested'
+    label, badge, explanation = STATUSES[status]
+    return {
+        'total': len(rows), 'counts': {k: len(v) for k, v in by_kind.items()},
+        'signed': sum(1 for r in rows if r.get('signed')),
+        'status': status, 'label': label, 'badge': badge, 'explanation': explanation,
+        'hashes': hashes, 'matches_declared': matches_declared, 'declared': bool(declared_hashes),
+        'inspections': inspections, 'evaluations': evaluations,
+        'measures': sorted({m for e in evaluations for m in e['measures']}),
+    }
+
+
+def overview(rows, recent=12):
+    """Site-wide numbers for the attestations page: ``rows`` is every attestation (identities included)."""
+    counts = collections.Counter(r['kind'] for r in rows)
+    subjects = {r['subject'] for r in rows if r.get('subject')}
+    ordered = sorted((r for r in rows if r['kind'] != 'identity'), key=lambda r: r['record'].get('attested_at') or '', reverse=True)
+    return {'counts': {k: counts.get(k, 0) for k in KINDS}, 'total': sum(counts.values()),
+            'nodes': len(subjects), 'signed': sum(1 for r in rows if r.get('signed') and r['kind'] != 'identity'),
+            'recent': ordered[:recent]}

@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}Attestations &mdash; ir-datasets.com{% endblock %}
+{% block content %}
+<h2 class="mb-3">Attestations</h2>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <p>An <strong>attestation</strong> is a claim someone made about a node: that they downloaded a file and got these hashes,
+    that they read through a table's records and they looked right, or that a system scored this well on a benchmark. They are how
+    the data in this catalog gets checked by people other than whoever wrote the code that loads it.</p>
+    <p>Anybody can submit one anonymously. To make an attestation count as coming from <em>you</em>, register an identity (a key pair) and
+    your submissions are signed with it. Attestations are held by a small server at <code>attest.ir-datasets.com</code> and appear in the graph as
+    <a href="{{ url_for('provider', prefix='attest') }}"><code>attest:</code></a> nodes, with an <code>attest:attestation</code> edge from the node each one is about. A node with attestations
+    gets a <strong>Verification</strong> card summarizing them.</p>
+    <p class="mb-0">Submit with the <code>ir_datasets attest</code> command or from Python (below); see <a href="https://github.com/ir-datasets/ir-datasets/blob/v2/ir_datasets/v2/attest/README.md">its README</a> for the details.</p>
+  </div>
+</div>
+
+<div class="row row-cards mb-3">
+  <div class="col-6 col-md">
+    <div class="card"><div class="card-body text-center"><div class="h1 mb-0">{{ '{:,}'.format(overview.nodes) }}</div><div class="text-secondary">nodes attested</div></div></div>
+  </div>
+  {% for kind, label, cls in [('hash', 'hash', 'HashAttestation'), ('visual', 'visual', 'VisualAttestation'), ('evaluation', 'evaluation', 'EvaluationAttestation')] %}
+  <div class="col-6 col-md">
+    <a class="card card-link" href="{{ node_url('attest:' ~ cls) }}"><div class="card-body text-center"><div class="h1 mb-0">{{ '{:,}'.format(overview.counts[kind]) }}</div><div class="text-secondary">{{ label }}</div></div></a>
+  </div>
+  {% endfor %}
+  <div class="col-6 col-md">
+    <a class="card card-link" href="{{ node_url('attest:IdentityAttestation') }}"><div class="card-body text-center"><div class="h1 mb-0">{{ '{:,}'.format(overview.counts.identity) }}</div><div class="text-secondary">identities</div></div></a>
+  </div>
+</div>
+
+<h3 class="mb-3">The kinds of attestation</h3>
+<div class="row row-cards mb-3">
+
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header"><h4 class="card-title"><a href="{{ node_url('attest:HashAttestation') }}"><code>HashAttestation</code></a></h4><div class="card-actions text-secondary">files and tables</div></div>
+      <div class="card-body">
+        <p>Hashes someone computed. For a <strong>file</strong>, the hashes of its bytes, and where they were downloaded from (nothing, for a copy obtained some other way). For a <strong>table</strong>, a hash over its parsed records, so it holds across re-encodings of the same data; <code>hash_version</code> says how it was computed, so the method can change later without invalidating old attestations.</p>
+        <pre class="bg-secondary-lt p-2 small overflow-auto"><code>{"kind": "hash", "subject": "irds:antique-test-queries.txt",
+ "attested_at": "2026-10-28T12:00:00Z",
+ "source": "https://ciir.cs.umass.edu/…",
+ "hashes": ["md5:…", "sha256:…"]}</code></pre>
+        <div class="text-secondary small mb-1">Submit</div>
+        <pre class="bg-secondary-lt p-2 small overflow-auto mb-0"><code>ir_datasets attest hash irds:antique-test-queries.txt   # a file
+ir_datasets attest hash irds:antique-test-queries       # a table</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header"><h4 class="card-title"><a href="{{ node_url('attest:VisualAttestation') }}"><code>VisualAttestation</code></a></h4><div class="card-actions text-secondary">tables</div></div>
+      <div class="card-body">
+        <p>A person's report that they read through a sample of a table's records and either they looked right, or they found problems (garbled text, misaligned ids, truncated documents&hellip;). It needs a person to have actually looked, so it <strong>must be signed</strong>: an anonymous &ldquo;a human checked this&rdquo; means little.</p>
+        <pre class="bg-secondary-lt p-2 small overflow-auto"><code>{"kind": "visual", "subject": "irds:antique-test-queries",
+ "attested_at": "2026-10-28T12:00:00Z",
+ "verdict": "ok",                // or "issues"
+ "notes": "texts look right",
+ "sample": ["3990512", "714612"]}   // ids inspected</code></pre>
+        <div class="text-secondary small mb-1">Submit</div>
+        <pre class="bg-secondary-lt p-2 small overflow-auto mb-0"><code>ir_datasets attest visual irds:antique-test-queries \
+    --verdict ok --sample 3990512 714612 --notes "texts look right"</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header"><h4 class="card-title"><a href="{{ node_url('attest:EvaluationAttestation') }}"><code>EvaluationAttestation</code></a></h4><div class="card-actions text-secondary">benchmarks</div></div>
+      <div class="card-body">
+        <p>Scores a system obtained on a benchmark. Run the same well-known system (BM25, say) on a benchmark and compare with what others got: a benchmark whose scores don't reproduce usually has a problem with its documents, queries or judgments.</p>
+        <pre class="bg-secondary-lt p-2 small overflow-auto"><code>{"kind": "evaluation", "subject": "irds:antique-test",
+ "attested_at": "2026-10-28T12:00:00Z",
+ "system": "Terrier BM25",
+ "measures": {"nDCG@10": 0.32, "MAP": 0.20}}</code></pre>
+        <div class="text-secondary small mb-1">Submit</div>
+        <pre class="bg-secondary-lt p-2 small overflow-auto mb-0"><code>ir_datasets attest evaluation irds:antique-test \
+    --system "Terrier BM25" -m nDCG@10=0.32 -m MAP=0.20</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header"><h4 class="card-title"><a href="{{ node_url('attest:IdentityAttestation') }}"><code>IdentityAttestation</code></a></h4><div class="card-actions text-secondary">people</div></div>
+      <div class="card-body">
+        <p>A username bound to a public key, vouched for by its own signature. Registering generates an Ed25519 key pair, sends the public half, and keeps the private half on your machine (<code>~/.ir_datasets/attest/identity.json</code>). From then on <code>ir_datasets attest</code> signs what you submit. Usernames are first come, first served.</p>
+        <pre class="bg-secondary-lt p-2 small overflow-auto"><code>{"kind": "identity", "attested_at": "2026-10-28T12:00:00Z",
+ "username": "alice", "public_key": "…"}</code></pre>
+        <div class="text-secondary small mb-1">Register</div>
+        <pre class="bg-secondary-lt p-2 small overflow-auto mb-0"><code>ir_datasets attest register alice</code></pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header"><h3 class="card-title">From Python</h3></div>
+  <div class="card-body">
+    <pre class="bg-secondary-lt p-3 overflow-auto mb-0"><code class="language-python">from ir_datasets.v2 import attest
+
+attest.attest_hash('irds:antique-test-queries')
+attest.attest_evaluation('irds:antique-test', 'Terrier BM25', {'nDCG@10': 0.32},
+                         identity=attest.Identity.load())   # omit identity to submit anonymously
+attest.for_node('irds:antique-test')                     # everything attested about a node</code></pre>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header"><h3 class="card-title">How the Verification card decides</h3></div>
+  <div class="card-body">
+    <p>Attestations are taken at face value; nothing here proves the data is right, only how well the attestations agree. A node's card shows one of these:</p>
+    <div class="mb-3">
+      {% for key, (label, badge, explanation) in statuses.items() %}
+      <div class="mb-1"><span class="badge {{ badge }}" style="min-width: 8rem">{{ label }}</span> <span class="ms-2">{{ explanation }}</span></div>
+      {% endfor %}
+    </div>
+    <ul class="mb-0">
+      <li>Hashes are grouped by <em>what</em> they hash (a file's bytes, or a table's content at one <code>hash_version</code>) and by algorithm; two attestations that hash the same thing with the same algorithm should give the same digest.</li>
+      <li>A file's hash is also checked against the hash the node itself declares, for any algorithm they have in common.</li>
+      <li>A single attestation, even a signed one, never reaches <em>Verified</em> on its own unless it matches the declared hash.</li>
+      <li>A signature says <em>who</em> made an attestation, checked by the server when it was received. It is not an endorsement.</li>
+    </ul>
+  </div>
+</div>
+
+{% if overview.recent %}
+<div class="card mb-3">
+  <div class="card-header"><h3 class="card-title">Recent attestations</h3><div class="card-actions text-secondary">{{ '{:,}'.format(overview.total) }} in all</div></div>
+  <div class="table-responsive">
+    <table class="table table-sm card-table table-vcenter">
+      <thead><tr><th>About</th><th>Kind</th><th>Detail</th><th>By</th><th>Date</th></tr></thead>
+      <tbody>
+      {% for r in overview.recent %}
+      <tr>
+        <td>{% if r.subject and node_exists(r.subject) %}<a href="{{ node_url(r.subject) }}">{{ node_code(r.subject) }}</a>{% else %}{{ node_code(r.subject) if r.subject else '' }}{% endif %}</td>
+        <td><a href="{{ node_url(r.id) }}" class="badge badge-sm bg-secondary-lt text-decoration-none">{{ r.kind }}</a></td>
+        <td>
+          {% if r.kind == 'hash' %}{% for spec in r.record.hashes %}{% set algo, _, digest = spec.partition(':') %}<span class="me-2"><code>{{ algo }}</code> {{ m.short_digest(digest, 10) }}</span>{% endfor %}
+          {% elif r.kind == 'visual' %}<span class="badge badge-sm {{ 'bg-green-lt' if r.record.verdict == 'ok' else 'bg-orange-lt' }}">{{ r.record.verdict }}</span> {{ r.record.notes or '' }}
+          {% elif r.kind == 'evaluation' %}{{ r.record.system }} <span class="text-secondary">{% for k, v in r.record.measures.items() %}{{ k }} {{ '%.4g'|format(v) }}{% if not loop.last %}, {% endif %}{% endfor %}</span>
+          {% endif %}
+        </td>
+        <td>{{ r.signer or 'anonymous' }}</td>
+        <td class="text-secondary">{{ (r.record.attested_at or '')[:10] }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card mb-3"><div class="card-body text-secondary">Nothing has been attested yet. Be the first: <code>ir_datasets attest hash irds:antique-test-queries</code></div></div>
+{% endif %}
+{% endblock %}

@@ -11,6 +11,8 @@ consume (``(subject, kind, object, other)`` triples, ``(name, type)`` pairs,
 import json
 import re
 
+from . import attestations
+
 from .rdf_schema import (
     FROZEN_FIELDS, RDF_JSON, RDF_PROPERTY, RDF_TYPE, RDFS_COMMENT, RDFS_DOMAIN, RDFS_RANGE, RDFS_SUBCLASS_OF,
     RDFS_SUBPROPERTY_OF, edge_iri, edge_kind, graph_name,
@@ -485,3 +487,60 @@ def counts_by_type(store, categories, providers=None):
             if closures[c].intersection(types):
                 counts[c] += 1
     return counts
+
+
+# -- attestations ------------------------------------------------------------
+
+_ATTESTATION = 'attest:attestation'
+_ATTESTATION_TYPE = 'attest:Attestation'
+_SIGNED_BY = 'attest:signedBy'
+#: More attestations than this and the site-wide overview stops loading every one of them.
+MAX_OVERVIEW_ATTESTATIONS = 20000
+
+
+def _identity_name(store, identity):
+    data = node_data(store, identity)
+    record = (data.values.get('record') or [{}])[0] if data else {}
+    return record.get('username') or identity.split(':', 1)[-1][:8]
+
+
+def _attestation_row(store, name):
+    """One attestation node as ``attestations``' row shape, or ``None`` if it isn't one."""
+    data = node_data(store, name)
+    kind = next((k for k in map(attestations.kind_of, data.types) if k), None) if data else None
+    if kind is None:
+        return None
+    record = (data.values.get('record') or [{}])[0]
+    signer = None
+    for quad in store.quads_for_pattern(node_iri(name), edge_iri(_SIGNED_BY), None):
+        signer = _identity_name(store, node_name(quad.object))
+    if kind == 'identity':
+        signer = record.get('username')
+    return {'id': name, 'kind': kind, 'subject': record.get('subject'), 'record': record,
+            'signed': 'signature' in data.values, 'signer': signer,
+            'verified': (data.values.get('verified') or ['false'])[0] == 'true'}
+
+
+def attestations_of(store, name):
+    """The attestations about node ``name``, as ``attestations`` rows (empty if none or if the
+    store has no ``attest`` provider)."""
+    rows = []
+    for quad in store.quads_for_pattern(node_iri(name), edge_iri(_ATTESTATION), None):
+        row = _attestation_row(store, node_name(quad.object))
+        if row:
+            rows.append(row)
+    return rows
+
+
+_all_attestations_cache = None
+
+
+def all_attestations(store):
+    """Every attestation in the store (identities too), as rows -- cached for the process, like
+    the type rows (the store never changes while the app runs)."""
+    global _all_attestations_cache
+    if _all_attestations_cache is None:
+        names, _ = list_nodes(store, type_filter=_ATTESTATION_TYPE, limit=MAX_OVERVIEW_ATTESTATIONS)
+        _all_attestations_cache = [r for r in (_attestation_row(store, n) for n, _ in names) if r]
+    return _all_attestations_cache
+

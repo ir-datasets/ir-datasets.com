@@ -6,6 +6,7 @@
 {% set sections = [('overview', 'Overview')]
   + ([('related', 'Related Nodes')] if related.sources or related.derived_from or related.used_by else [])
   + ([('samples', 'Sample Rows')] if sample_table[1] else [])
+  + ([('verification', 'Verification')] if verification else [])
   + [('use-it', 'Use It'), ('raw-triples', 'Raw Triples')]
   + ([('frozen', 'Declared Facts')] if frozen else []) %}
 {% set sections = with_about(sections, node) %}
@@ -27,6 +28,7 @@
           {% if count is not none %}<div class="acq-row"><span class="acq-label">Rows</span><span>{{ '{:,}'.format(count) }}</span></div>{% endif %}
 {{ m.citation_row(node) }}
 {{ m.license_row(node) }}
+{{ m.verification_row(verification) }}
         </div>
       </div>
     </div>
@@ -168,6 +170,8 @@
   </div>
 </div>
 {% endif %}
+
+{{ m.verification_card(verification, node) }}
 
 {{ m.use_it_section(snippet, package=package, requires=requires, variants=snippet_variants) }}
 

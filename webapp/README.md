@@ -55,6 +55,16 @@ graph is built from the imported `ir_datasets.v2` modules.
 inside the installed package -- override with `--out`/`--store` or the
 `IR_DATASETS_SITE_STORE` environment variable if you want it elsewhere.
 
+## Attestations
+
+`/attestations` explains the four kinds of attestation (`attest:` nodes, held by the server in
+[`../attest`](../attest) and part of the graph once built with the `attest` provider) and lists the recent ones.
+A table, file or benchmark that has `attest:attestation` edges gets a **Verification** card (and an Overview row
+linking to it): hash attestations grouped by what they hash and algorithm and checked against each other and
+the node's declared hash, inspections, and evaluations. How a status is decided is in `attestations.py`
+(pure functions, tested by `python -m unittest discover -s tests`). The card reflects the attestations at
+`build-graph-db` time, like everything else here.
+
 ## Downloading the graph data
 
 `graph.db` is a pyoxigraph/RocksDB directory in an internal, Oxigraph-specific
