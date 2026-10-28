@@ -24,3 +24,8 @@ ir-datasets-attest-server --db attest.db --port 8000
 IR_DATASETS_ATTEST_URL=http://127.0.0.1:8000 ir_datasets attest register alice
 python -m unittest discover -s tests
 ```
+
+
+# Deploying a new version
+
+Please tag a git commit to trigger a new release of the ghcr.io/ir-datasets/attest-server image. You can point your kubernetes server to  ghcr.io/ir-datasets/attest-server:latest to always use the latest version of the attest server. Please ensure that the `/data` directory in the container/pod uses persistent storage mounts.
