@@ -277,8 +277,8 @@
 {% endif %}
 {% endmacro %}
 
-{# One kind's pane of the Verification card: a plain line on what it verifies, a datagrid (status, count, most recent), the
-   kind's details if it has any (``caller()``), and at the bottom, like the Installation card, the command to add one. #}
+{# One kind's pane of the Verification card: a plain line on what it verifies, a datagrid (status, count, most recent), and at
+   the bottom, like the Installation card, the command to add one. #}
 {% macro _verification_pane(kind, shown, v, description, command) %}
 {% set status = v.kind_status[kind] %}
 {% set latest = v.latest[kind] %}
@@ -304,8 +304,6 @@
           <div class="datagrid-content">{% if latest %}{{ latest.ago }} (<a href="{{ node_url(latest.id) }}">details</a>){% else %}<span class="text-secondary">&mdash;</span>{% endif %}</div>
         </div>
       </div>
-      {% set body = caller() %}
-      {% if body | trim %}<div class="border-top mt-3 pt-3">{{ body }}</div>{% endif %}
     </div>
     <pre class="bg-secondary-lt p-3 overflow-auto mb-0" style="border-radius: 0"><code class="language-bash">{{ command }}</code></pre>
   </div>
@@ -332,45 +330,15 @@
   </div>
 
   {% if 'hash' in v.can_attest %}
-  {% call _verification_pane('hash', ns.shown == 'hash', v, 'Hash attestations ensure ' ~ ('record-for-record' if 'visual' in v.can_attest else 'byte-for-byte') ~ ' equivalence.', 'ir_datasets attest hash ' ~ name) %}{% endcall %}
+  {{ _verification_pane('hash', ns.shown == 'hash', v, 'Hash attestations ensure ' ~ ('record-for-record' if 'visual' in v.can_attest else 'byte-for-byte') ~ ' equivalence.', 'ir_datasets attest hash ' ~ name) }}
   {% endif %}
 
   {% if 'visual' in v.can_attest %}
-  {% call _verification_pane('visual', ns.shown == 'visual', v, 'Visual attestations record that a person looked through a sample of the records.', 'ir_datasets attest visual ' ~ name ~ ' --verdict ok --sample ID1 ID2') %}
-      {% if v.inspections %}
-      <div class="acq-rows acq-rows-xwide">
-        {% for i in v.inspections %}
-        <div class="acq-row">
-          <span class="acq-label {{ 'text-green' if i.verdict == 'ok' else 'text-orange' }}">{{ 'looks right' if i.verdict == 'ok' else 'issues' }}</span>
-          <span>
-            <strong>{{ i.who or 'anonymous' }}</strong>
-            <span class="text-secondary">&middot; {{ i.date }}{% if i.sample %} &middot; {{ i.sample }} record{{ '' if i.sample == 1 else 's' }} checked{% endif %}</span>
-            {% if i.notes %}<div>{{ i.notes }}</div>{% endif %}
-          </span>
-        </div>
-        {% endfor %}
-      </div>
-      {% endif %}
-  {% endcall %}
+  {{ _verification_pane('visual', ns.shown == 'visual', v, 'Visual attestations record that a person looked through a sample of the records.', 'ir_datasets attest visual ' ~ name ~ ' --verdict ok --sample ID1 ID2') }}
   {% endif %}
 
   {% if 'evaluation' in v.can_attest %}
-  {% call _verification_pane('evaluation', ns.shown == 'evaluation', v, 'Evaluation attestations record the scores systems obtained on this benchmark.', 'ir_datasets attest evaluation ' ~ name ~ ' --system "NAME" -m nDCG@10=0.0') %}
-      {% if v.systems %}
-      <div class="acq-rows acq-rows-xwide">
-        {% for sys in v.systems %}
-        <div class="acq-row">
-          <span class="acq-label text-body fw-semibold">{{ sys.system }}</span>
-          <span>
-            {% for e in sys.entries %}
-            <div>{% for k, val in e.measures.items() %}<span class="me-3"><span class="text-secondary">{{ k }}</span> <strong>{{ '%.4g'|format(val) }}</strong></span>{% endfor %} <span class="text-secondary small">{{ e.who or 'anonymous' }} &middot; {{ e.date }}</span></div>
-            {% endfor %}
-          </span>
-        </div>
-        {% endfor %}
-      </div>
-      {% endif %}
-  {% endcall %}
+  {{ _verification_pane('evaluation', ns.shown == 'evaluation', v, 'Evaluation attestations record the scores systems obtained on this benchmark.', 'ir_datasets attest evaluation ' ~ name ~ ' --system "NAME" -m nDCG@10=0.0') }}
   {% endif %}
 </div>
 {% endif %}
