@@ -2,6 +2,7 @@
 
     POST /register                       create an IdentityAttestation
     POST /{hash,visual,evaluation}       create an attestation about a node
+    POST /revoke                         delete an attestation (a signed request, from the identity that signed it)
     GET  /[?full=1&after=N&limit=M]      attestations (id and type; whole records with full), after seq N
     GET  /<id>,<id>,...                  those records
     GET  /<prefix:name>                  every attestation about a node
@@ -17,7 +18,7 @@ from wsgiref.simple_server import WSGIRequestHandler, make_server
 from ir_datasets.v2.attest import crypto, records
 
 _STATUS = {200: '200 OK', 201: '201 Created', 400: '400 Bad Request', 404: '404 Not Found',
-           405: '405 Method Not Allowed', 409: '409 Conflict', 413: '413 Payload Too Large',
+           403: '403 Forbidden', 405: '405 Method Not Allowed', 409: '409 Conflict', 413: '413 Payload Too Large',
            422: '422 Unprocessable Entity'}
 
 
@@ -54,6 +55,8 @@ class App:
                 return 201, self.register(body)
             if path in records.SUBMITTABLE:
                 return 201, self.submit(path, body)
+            if path == 'revoke':
+                return 200, self.revoke(body)
             raise HttpError(404, f'no such endpoint: POST /{path}')
         raise HttpError(405, 'only GET and POST are supported')
 
@@ -84,7 +87,7 @@ class App:
                 raise HttpError(400, 'after and limit must be integers')
             rows = self.store.since(after, limit)
             if 'full' not in query:
-                rows = [{'id': r['id'], 'type': r['type'], 'seq': r['seq']} for r in rows]
+                rows = [{k: r[k] for k in ('id', 'type', 'seq', 'deleted') if k in r} for r in rows]
             return {'attestations': rows}
         if ':' in path:      # a node name; ids are bare GUIDs
             return {'subject': path, 'attestations': self.store.for_subject(path)}
@@ -125,6 +128,32 @@ class App:
             if not verified:
                 raise HttpError(422, 'signature does not verify against the identity\'s public key')
         return {'id': self.store.add(kind, subject, record, signature=signature, signed_by=signed_by, verified=verified)}
+
+    def revoke(self, body):
+        """Delete an attestation, at the request of whoever signed it. The request is a signed record naming the
+        attestation (``subject: attest:<id>``): it must be signed by the identity that signed that attestation, and
+        verify against that identity's public key -- which is the proof that the key's owner is the one asking.
+        Nothing about the request is kept; the attestation's content is erased (see ``Store.delete``). An
+        anonymous attestation has no key behind it, so it cannot be deleted; nor can an identity."""
+        record = self._record(records.REVOCATION, body)
+        signature, signed_by = body.get('signature'), body.get('signed_by')
+        if not (signature and signed_by):
+            raise HttpError(422, 'a deletion must be signed (signature and signed_by)')
+        target_id = record['subject'].split(':', 1)[1]
+        target = self.store.get(target_id)
+        if target is None:
+            raise HttpError(404, f'no such attestation: {record["subject"]}')
+        if target['type'] == records.IDENTITY:
+            raise HttpError(422, 'an identity cannot be deleted')
+        if not target['signed_by']:
+            raise HttpError(422, 'that attestation is anonymous (not signed), so no key can prove it is theirs')
+        if signed_by != target['signed_by']:
+            raise HttpError(403, 'only the identity that signed an attestation can delete it')
+        identity = self.store.get(signed_by)
+        if identity is None or not crypto.verify(identity['record']['public_key'], signature, records.signing_payload(record)):
+            raise HttpError(422, 'signature does not verify against the identity\'s public key')
+        self.store.delete(target_id)
+        return {'id': target_id, 'deleted': True}
 
     @staticmethod
     def _record(kind, body, fill_timestamp=False):

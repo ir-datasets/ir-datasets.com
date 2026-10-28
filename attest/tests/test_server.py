@@ -1,5 +1,6 @@
 """End to end: the real server, in a thread, against the real client from ir_datasets.v2.attest."""
 import os
+import sqlite3
 import tempfile
 import threading
 import unittest
@@ -18,7 +19,8 @@ class ServerCase(unittest.TestCase):
         patch = mock.patch.dict(os.environ, {'IR_DATASETS_HOME': home.name})   # identities are saved here
         patch.start()
         self.addCleanup(patch.stop)
-        self.httpd = server.make(store.Store(), port=0, quiet=True)
+        self.store = store.Store()
+        self.httpd = server.make(self.store, port=0, quiet=True)
         threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
         self.client = Client(f'http://127.0.0.1:{self.httpd.server_port}')
         self.addCleanup(self.httpd.server_close)
@@ -102,6 +104,95 @@ class TestSubmitting(ServerCase):
 
     def test_body_limit(self):
         self.assertRefused(413, self.post, 'hash', {'record': {'pad': 'x' * records.MAX_BODY_BYTES}})
+
+
+class TestDeleting(ServerCase):
+    """A signer can delete what they signed; the proof is a request signed with the key."""
+
+    def setUp(self):
+        super().setUp()
+        self.alice = self.client.register('alice')
+        self.bob = self.client.register('bob')
+        self.mine = self.client.submit('hash', 'irds:antique-docs', HASH, self.alice)
+        self.theirs = self.client.submit('hash', 'irds:antique-docs', HASH, self.bob)
+        self.anon = self.client.submit('hash', 'irds:antique-docs', HASH)
+
+    def request(self, target, identity, **changes):
+        """A deletion request for ``target`` signed by ``identity``, the way the client builds one."""
+        record = {'kind': 'revocation', 'subject': f'attest:{target}', 'attested_at': records.now(), **changes}
+        return {'record': record, 'signature': identity.sign(records.signing_payload(record)), 'signed_by': identity.identity_id}
+
+    def test_signer_deletes(self):
+        self.assertEqual(self.mine, self.client.revoke(self.mine, 'wrong file', self.alice))
+        self.assertRefused(404, self.client.get, self.mine)
+        self.assertRefused(404, self.client._call, 'GET', self.mine)
+        self.assertEqual({self.theirs, self.anon}, {r['id'] for r in self.client.for_node('irds:antique-docs')})
+        self.assertNotIn(self.mine, self.client.ids())
+
+    def test_it_leaves_a_tombstone_that_readers_syncing_from_before_see(self):
+        before = max(r['seq'] for r in self.client.records())
+        self.client.revoke(self.mine, identity=self.alice)
+        [gone] = list(self.client.records(after=before))
+        self.assertEqual({'id': self.mine, 'type': 'hash', 'seq': gone['seq'], 'deleted': True}, gone)   # no content
+        self.assertGreater(gone['seq'], before)
+        rows = {r['id']: r for r in self.client.records()}
+        self.assertTrue(rows[self.mine]['deleted'])
+        self.assertNotIn('record', rows[self.mine])
+        light = {a['id']: a for a in self.client._call('GET', '')['attestations']}
+        self.assertTrue(light[self.mine]['deleted'])
+
+    def test_the_content_is_erased_from_the_database(self):
+        self.client.revoke(self.mine, identity=self.alice)
+        row = self.store._db.execute('SELECT * FROM attestation WHERE id = ?', (self.mine,)).fetchone()
+        self.assertEqual(('{}', None, None), (row['record'], row['signature'], row['subject']))
+        self.assertIsNotNone(row['deleted_at'])
+
+    def test_only_the_signer_may_delete(self):
+        self.assertRefused(403, self.post, 'revoke', self.request(self.mine, self.bob))     # bob's key, alice's attestation
+        with self.assertRaises(ValueError):                                                  # the client says so before asking
+            self.client.revoke(self.mine, identity=self.bob)
+        self.assertIn(self.mine, self.client.ids())
+
+    def test_anonymous_attestations_and_identities_cannot_be_deleted(self):
+        self.assertRefused(422, self.post, 'revoke', self.request(self.anon, self.alice))
+        with self.assertRaises(ValueError):
+            self.client.revoke(self.anon, identity=self.alice)
+        self.assertRefused(422, self.post, 'revoke', self.request(self.alice.identity_id, self.alice))
+        with self.assertRaises(ValueError):
+            self.client.revoke(self.alice.identity_id, identity=self.alice)
+
+    def test_the_request_must_really_be_signed_by_that_key(self):
+        request = self.request(self.mine, self.alice)
+        self.assertRefused(422, self.post, 'revoke', {**request, 'signature': self.bob.sign(b'whatever')})    # not alice's signature
+        forged = self.request(self.mine, self.alice)
+        forged['record'] = {**forged['record'], 'subject': f'attest:{self.theirs}'}                          # signature for another target
+        forged['signed_by'] = self.bob.identity_id
+        self.assertRefused(422, self.post, 'revoke', forged)
+        self.assertRefused(422, self.post, 'revoke', {'record': request['record']})                          # unsigned
+        self.assertRefused(422, self.post, 'revoke', {**request, 'record': {**request['record'], 'subject': 'irds:antique-docs'}})
+        self.assertIn(self.mine, self.client.ids())
+
+    def test_gone_means_gone(self):
+        request = self.request(self.mine, self.alice)
+        self.post('revoke', request)
+        self.assertRefused(404, self.post, 'revoke', request)     # replaying it finds nothing
+        self.assertRefused(404, self.post, 'revoke', self.request('00000000-0000-0000-0000-000000000000', self.alice))
+
+
+class TestOldDatabase(unittest.TestCase):
+    def test_a_database_from_before_deletion_is_upgraded(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, 'old.db')
+            db = sqlite3.connect(path)
+            db.executescript('''CREATE TABLE attestation (id TEXT PRIMARY KEY, kind TEXT NOT NULL, subject TEXT, record TEXT NOT NULL,
+                signature TEXT, signed_by TEXT, verified INTEGER NOT NULL DEFAULT 0, received_at TEXT NOT NULL, seq INTEGER NOT NULL);
+                INSERT INTO attestation VALUES ('a', 'hash', 'irds:x', '{}', NULL, NULL, 0, 'now', 1);''')
+            db.commit()
+            db.close()
+            old = store.Store(path)
+            self.assertEqual('a', old.get('a')['id'])
+            self.assertTrue(old.delete('a'))
+            self.assertIsNone(old.get('a'))
 
 
 if __name__ == '__main__':

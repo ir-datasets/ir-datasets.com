@@ -87,7 +87,7 @@ ir_datasets attest hash irds:antique-test-queries       # a table</code></pre>
     <div class="card h-100">
       <div class="card-header"><h4 class="card-title"><a href="{{ node_url('attest:IdentityAttestation') }}"><code>IdentityAttestation</code></a></h4><div class="card-actions text-secondary">people</div></div>
       <div class="card-body">
-        <p>A username bound to a public key, vouched for by its own signature. Registering generates an Ed25519 key pair, sends the public half, and keeps the private half on your machine (<code>~/.ir_datasets/attest/identity.json</code>). From then on <code>ir_datasets attest</code> signs what you submit. Usernames are first come, first served.</p>
+        <p>A username bound to a public key, vouched for by its own signature. Registering generates an Ed25519 key pair, sends the public half, and keeps the private half on your machine (<code>~/.ir_datasets/attest/identity.json</code>). From then on <code>ir_datasets attest</code> signs what you submit, and only you can delete it (<code>ir_datasets attest revoke &lt;id&gt;</code>). Usernames are first come, first served.</p>
         <pre class="bg-secondary-lt p-2 small overflow-auto"><code>{"kind": "identity", "attested_at": "2026-10-28T12:00:00Z",
  "username": "alice", "public_key": "…"}</code></pre>
         <div class="text-secondary small mb-1">Register</div>
