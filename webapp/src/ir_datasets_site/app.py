@@ -118,6 +118,7 @@ TYPE_LABELS = {
     v2.SUITE: 'Suite',            # before Benchmark: a Suite is a Benchmark, and the first match wins
     v2.BENCHMARK: 'Benchmark',
     v2.BUNDLE: 'Bundle',
+    'attest:Attestation': 'Attestation',
 }
 
 #: Same vocabulary, plural -- for a category listing (the home page's stat
@@ -135,6 +136,7 @@ TEMPLATE_BY_TYPE = {
     v2.SUITE: 'node_suite.html',
     v2.BENCHMARK: 'node_benchmark.html',
     v2.BUNDLE: 'node_bundle.html',
+    'attest:Attestation': 'node_attestation.html',
 }
 
 #: Exact-type template overrides, checked before the category-based
@@ -160,6 +162,7 @@ TYPE_COLOR_SLUGS = {
     v2.BENCHMARK: 'bundle',
     v2.SUITE: 'bundle',
     v2.BUNDLE: 'bundle',
+    'attest:Attestation': 'attestation',
 }
 #: An unrecognized (future third-party) type still gets a color, just a
 #: neutral one -- see _category_of.
@@ -1028,6 +1031,22 @@ def class_page(qualified):
         rows=[_row_dict(name, ts) for name, ts in rows], total=total, shown=len(rows))
 
 
+def _attestation_view(node, qualified):
+    """What an attestation node's page shows: its row, how its hashes compare with the other attestations about the
+    same node, and (for an identity) what it has signed. ``None`` for any other node."""
+    if not v2.is_subclass(node.type, 'attest:Attestation') or not isinstance(node, gq.NodeView):
+        return None
+    row = gq.attestation_row(store, qualified)
+    if row is None:
+        return None
+    view = dict(row, environment=row['record'].get('environment') or {}, comparison=[], signed_rows=[])
+    if row['kind'] == 'hash' and row['subject']:
+        view['comparison'] = attest_summary.compare_hash(row, gq.attestations_of(store, row['subject']))
+    if row['kind'] == 'identity':
+        view['signed_rows'] = gq.signed_by(store, qualified)
+    return view
+
+
 def _attestable(node):
     """Which kinds of attestation can be made about a node: hashes for a file or a table, a visual check
     for a table, scores for a benchmark. Empty for everything else (a directory, a suite, a bundle...)."""
@@ -1507,6 +1526,9 @@ def node(qualified):
     category = _category_of(n.type)
     template = (TEMPLATE_BY_EXACT_TYPE.get(n.type)
                 or TEMPLATE_BY_TYPE.get(category, 'node_generic.html'))
+    attestation = _attestation_view(n, qualified)
+    if template == 'node_attestation.html' and attestation is None:
+        template = 'node_generic.html'      # an attestation record this site cannot read
     frozen = _frozen_of(n)
     requires = _requires_for(n, qualified)
     package = _package_of(n)
@@ -1517,7 +1539,7 @@ def node(qualified):
             derived.append({'name': subject, 'type': o.type if o else None})
     related = _related(n, triples)
     return render_template(
-        template, node=n, verification=_verification(n, qualified), frozen=frozen, triples=triples, raw_triples=raw_triples, raw_total=raw_total,
+        template, node=n, verification=_verification(n, qualified), attestation=attestation, frozen=frozen, triples=triples, raw_triples=raw_triples, raw_total=raw_total,
         requires=requires, install_hint=v2_requirements.install_hint(requires) if requires else None,
         package=package,
         derived=derived,

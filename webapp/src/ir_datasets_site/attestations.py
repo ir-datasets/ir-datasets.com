@@ -75,6 +75,28 @@ def _hash_groups(rows, declared):
     return out, conflict, bool(declared) and any(g['matches_declared'] for g in out)
 
 
+def compare_hash(row, others):
+    """How each hash in the hash attestation ``row`` stands against the ``others`` about the same node: for
+    every (what it hashes, algorithm) how many others gave the same digest and how many a different one."""
+    out = []
+    for spec in row['record'].get('hashes') or []:
+        algo, digest = _parse_hash(spec)
+        scope = f"table v{row['record']['hash_version']}" if 'hash_version' in row['record'] else 'file'
+        agree = differ = 0
+        for other in others:
+            if other['kind'] != 'hash' or other['id'] == row['id']:
+                continue
+            record = other['record']
+            if (f"table v{record['hash_version']}" if 'hash_version' in record else 'file') != scope:
+                continue
+            for o_spec in record.get('hashes') or []:
+                o_algo, o_digest = _parse_hash(o_spec)
+                if o_algo == algo:
+                    agree, differ = agree + (o_digest == digest), differ + (o_digest != digest)
+        out.append({'scope': scope, 'algo': algo, 'digest': digest, 'agree': agree, 'differ': differ})
+    return out
+
+
 def summarize(rows, declared_hashes=()):
     """The Verification card's content for the attestations ``rows`` about one node (``declared_hashes``:
     the node's own ``algo:hex`` hashes, if it declares any)."""

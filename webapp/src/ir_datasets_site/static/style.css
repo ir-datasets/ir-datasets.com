@@ -2,6 +2,7 @@
   --icon-resource: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='white'%3E%3Cpath stroke='none' d='M0 0h24v24H0z' fill='none'/%3E%3Cpath d='M12 2l.117 .007a1 1 0 0 1 .876 .876l.007 .117v4l.005 .15a2 2 0 0 0 1.838 1.844l.157 .006h4l.117 .007a1 1 0 0 1 .876 .876l.007 .117v9a3 3 0 0 1 -2.824 2.995l-.176 .005h-10a3 3 0 0 1 -2.995 -2.824l-.005 -.176v-14a3 3 0 0 1 2.824 -2.995l.176 -.005zm-1 9h-1a2 2 0 0 0 -2 2v3a2 2 0 0 0 2 2h1a2 2 0 0 0 2 -2v-3a2 2 0 0 0 -2 -2m4 0a1 1 0 0 0 -1 1v5a1 1 0 0 0 2 0v-5a1 1 0 0 0 -1 -1m-4 2v3h-1v-3z'/%3E%3Cpath d='M19 7h-4l-.001 -4.001z'/%3E%3C/svg%3E");
   --icon-table: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='white'%3E%3Cpath stroke='none' d='M0 0h24v24H0z' fill='none'/%3E%3Cpath d='M4 11h4a1 1 0 0 1 1 1v8a1 1 0 0 1 -1 1h-2a3 3 0 0 1 -2.995 -2.824l-.005 -.176v-6a1 1 0 0 1 1 -1z'/%3E%3Cpath d='M21 12v6a3 3 0 0 1 -2.824 2.995l-.176 .005h-6a1 1 0 0 1 -1 -1v-8a1 1 0 0 1 1 -1h8a1 1 0 0 1 1 1z'/%3E%3Cpath d='M18 3a3 3 0 0 1 2.995 2.824l.005 .176v2a1 1 0 0 1 -1 1h-8a1 1 0 0 1 -1 -1v-4a1 1 0 0 1 1 -1h6z'/%3E%3Cpath d='M9 4v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1v-2a3 3 0 0 1 2.824 -2.995l.176 -.005h2a1 1 0 0 1 1 1z'/%3E%3C/svg%3E");
   --icon-node: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath stroke='none' d='M0 0h24v24H0z' fill='none'/%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3C/svg%3E");
+  --icon-attestation: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath stroke='none' d='M0 0h24v24H0z' fill='none'/%3E%3Cpath d='M11.46 20.846a12 12 0 0 1 -7.96 -14.846a12 12 0 0 0 8.5 -3a12 12 0 0 0 8.5 3a12 12 0 0 1 -.09 7.06'/%3E%3Cpath d='M15 19l2 2l4 -4'/%3E%3C/svg%3E");
   --icon-bundle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath stroke='none' d='M0 0h24v24H0z' fill='none'/%3E%3Cpath d='M12 4l-8 4l8 4l8 -4l-8 -4'/%3E%3Cpath d='M4 12l8 4l8 -4'/%3E%3Cpath d='M4 16l8 4l8 -4'/%3E%3C/svg%3E");
 }
 
@@ -72,6 +73,7 @@ code {
   --cat-bundle: #9D174D;
   --cat-benchmark: var(--cat-bundle);
   --cat-suite: var(--cat-bundle);
+  --cat-attestation: #4338CA;
   --cat-default: #667382;
 }
 
@@ -80,6 +82,7 @@ code {
 .text-cat-bundle { color: var(--cat-bundle) !important; }
 .text-cat-benchmark { color: var(--cat-benchmark) !important; }
 .text-cat-suite { color: var(--cat-suite) !important; }
+.text-cat-attestation { color: var(--cat-attestation) !important; }
 .text-cat-default { color: var(--cat-default) !important; }
 
 .border-cat-resource { border-color: var(--cat-resource) !important; }
@@ -87,6 +90,7 @@ code {
 .border-cat-bundle { border-color: var(--cat-bundle) !important; }
 .border-cat-benchmark { border-color: var(--cat-benchmark) !important; }
 .border-cat-suite { border-color: var(--cat-suite) !important; }
+.border-cat-attestation { border-color: var(--cat-attestation) !important; }
 .border-cat-default { border-color: var(--cat-default) !important; }
 
 .badge-cat-resource, a.badge-cat-resource { background: var(--cat-resource); color: #fff; }
@@ -94,6 +98,7 @@ code {
 .badge-cat-bundle, a.badge-cat-bundle { background: var(--cat-bundle); color: #fff; }
 .badge-cat-benchmark, a.badge-cat-benchmark { background: var(--cat-benchmark); color: #fff; }
 .badge-cat-suite, a.badge-cat-suite { background: var(--cat-suite); color: #fff; }
+.badge-cat-attestation, a.badge-cat-attestation { background: var(--cat-attestation); color: #fff; }
 .badge-cat-default, a.badge-cat-default { background: var(--cat-default); color: #fff; }
 
 /* Per-category badge icons (Tabler outline icons, stroke-width 1) -- one
@@ -106,6 +111,7 @@ code {
 .badge-cat-bundle::before,
 .badge-cat-benchmark::before,
 .badge-cat-suite::before,
+.badge-cat-attestation::before,
 .badge-cat-default::before {
   content: '';
   display: inline-block;
@@ -117,6 +123,9 @@ code {
 }
 .badge-cat-default::before {
   background-image: var(--icon-node);
+}
+.badge-cat-attestation::before {
+  background-image: var(--icon-attestation);
 }
 .badge-cat-resource::before {
   background-image: var(--icon-resource);

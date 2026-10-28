@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}{{ node.qualified_name }} &mdash; ir-datasets.com{% endblock %}
+{% block content %}
+
+{% set a = attestation %}
+{% set sections = [('overview', 'Overview'), ('record', {'hash': 'Hashes', 'visual': 'Inspection', 'evaluation': 'Evaluation', 'identity': 'Identity'}[a.kind])]
+  + ([('signature', 'Signature')] if a.signed else [])
+  + ([('signed', 'Signed Attestations')] if a.signed_rows else [])
+  + [('raw-triples', 'Raw Triples')] %}
+{% call m.spy_layout(sections) %}
+<h2 class="mb-3"><code class="select"><a href="{{ url_for('provider', prefix=provider_of(node.qualified_name)) }}" class="text-secondary">{{ provider_of(node.qualified_name) }}:</a>{{ node.qualified_name.split(':', 1)[1] }}</code></h2>
+
+<div class="card spy-target" id="overview">
+  <div class="card-body">
+    <div class="acq">
+      <div class="acq-icon bg-indigo-lt text-indigo">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M11.46 20.846a12 12 0 0 1 -7.96 -14.846a12 12 0 0 0 8.5 -3a12 12 0 0 0 8.5 3a12 12 0 0 1 -.09 7.06"/><path d="M15 19l2 2l4 -4"/></svg>
+      </div>
+      <div class="acq-main">
+        <div class="acq-title">Overview</div>
+        <div class="acq-rows acq-rows-wide">
+{{ m.type_row(node) }}
+          {% if a.kind == 'identity' %}
+          <div class="acq-row"><span class="acq-label">Username</span><strong>{{ a.record.username }}</strong></div>
+          {% else %}
+          <div class="acq-row"><span class="acq-label">About</span><span><a href="{{ node_url(a.subject) }}">{{ node_code(a.subject) }}</a> {{ node_badge(a.subject) }} {% if node_exists(a.subject) %}<a href="{{ node_url(a.subject) }}#verification" class="ms-1 small">(its verification)</a>{% endif %}</span></div>
+          {% endif %}
+          <div class="acq-row"><span class="acq-label">{{ 'Registered' if a.kind == 'identity' else 'Attested' }}</span><span>{{ a.record.attested_at }}</span></div>
+          {% if a.kind != 'identity' %}
+          <div class="acq-row"><span class="acq-label">By</span><span>
+            {% if a.signed %}<a href="{{ node_url(a.signer_id) }}"><strong>{{ a.signer }}</strong></a>
+              {% if a.verified %}<span class="text-green">&middot; signature checked by the server</span>{% else %}<span class="text-orange">&middot; signature not checked</span>{% endif %}
+            {% else %}<span class="text-secondary">anonymous (not signed)</span>{% endif %}
+          </span></div>
+          {% endif %}
+          {% if a.environment %}
+          <div class="acq-row"><span class="acq-label">Made with</span><span class="text-secondary">{% set e = a.environment %}{{ ['Python ' ~ e.python if e.python, e.os, ('(' ~ e.machine ~ ')') if e.machine, ('ir_datasets ' ~ e.ir_datasets) if e.ir_datasets] | select | join(' · ') }}</span></div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card mt-3 spy-target" id="record">
+  <div class="card-header">
+    <h3 class="card-title">{{ {'hash': 'Hashes', 'visual': 'Inspection', 'evaluation': 'Evaluation', 'identity': 'Identity'}[a.kind] }}</h3>
+  </div>
+  <div class="card-body">
+    <div class="acq-rows acq-rows-xwide">
+      {% if a.kind == 'hash' %}
+        {% for c in a.comparison %}
+        <div class="acq-row">
+          <span class="acq-label"><code>{{ c.algo }}</code> of the {{ c.scope }}</span>
+          <span>
+            <code class="text-break" data-copy="{{ c.digest }}" title="click to copy" style="cursor: copy">{{ c.digest }}</code>
+            <div class="small">
+              {% if c.differ %}<span class="text-red">differs from {{ c.differ }} other attestation{{ '' if c.differ == 1 else 's' }}</span>{% endif %}
+              {% if c.differ and c.agree %} &middot; {% endif %}
+              {% if c.agree %}<span class="text-green">agrees with {{ c.agree }} other attestation{{ '' if c.agree == 1 else 's' }}</span>{% endif %}
+              {% if not c.agree and not c.differ %}<span class="text-secondary">no other attestation of this yet</span>{% endif %}
+            </div>
+          </span>
+        </div>
+        {% endfor %}
+        {% if a.record.source %}<div class="acq-row"><span class="acq-label">Downloaded from</span><a href="{{ a.record.source }}" class="text-break" rel="noopener">{{ a.record.source }}</a></div>
+        {% elif a.record.hash_version is not defined %}<div class="acq-row"><span class="acq-label">Downloaded from</span><span class="text-secondary">not recorded (a copy obtained some other way)</span></div>{% endif %}
+        {% if a.record.hash_version is defined %}<div class="acq-row"><span class="acq-label">Method</span><span>table hash, version {{ a.record.hash_version }}</span></div>{% endif %}
+      {% elif a.kind == 'visual' %}
+        <div class="acq-row"><span class="acq-label">Verdict</span><strong class="{{ 'text-green' if a.record.verdict == 'ok' else 'text-orange' }}">{{ 'looks right' if a.record.verdict == 'ok' else 'issues found' }}</strong></div>
+        {% if a.record.notes %}<div class="acq-row"><span class="acq-label">Notes</span><span>{{ a.record.notes }}</span></div>{% endif %}
+        {% if a.record.sample %}<div class="acq-row"><span class="acq-label">Records checked</span><span>{% for r in a.record.sample %}<code class="me-2">{{ r }}</code>{% endfor %}<span class="text-secondary">({{ a.record.sample|length }})</span></span></div>{% endif %}
+      {% elif a.kind == 'evaluation' %}
+        <div class="acq-row"><span class="acq-label">System</span><strong>{{ a.record.system }}</strong></div>
+        {% for k, val in a.record.measures.items() %}<div class="acq-row"><span class="acq-label">{{ k }}</span><span>{{ '%.4g'|format(val) }}</span></div>{% endfor %}
+      {% else %}
+        <div class="acq-row"><span class="acq-label">Username</span><strong>{{ a.record.username }}</strong></div>
+        <div class="acq-row"><span class="acq-label">Public key</span><code class="text-break" data-copy="{{ a.record.public_key }}" title="click to copy" style="cursor: copy">{{ a.record.public_key }}</code></div>
+        <div class="acq-row"><span class="acq-label">Algorithm</span><span>Ed25519</span></div>
+      {% endif %}
+    </div>
+  </div>
+  <div class="card-footer">
+    <details>
+      <summary class="text-secondary">The record, as submitted (JSON)</summary>
+      <pre class="bg-secondary-lt p-3 mt-2 mb-0 overflow-auto"><code>{{ a.record | tojson(indent=2) }}</code></pre>
+    </details>
+  </div>
+</div>
+
+{% if a.signed %}
+<div class="card mt-3 spy-target" id="signature">
+  <div class="card-header"><h3 class="card-title">Signature</h3></div>
+  <div class="card-body">
+    <p class="text-secondary">An Ed25519 signature over the record above, as canonical JSON (sorted keys, no whitespace), so it also covers which node it is about and when. {% if a.kind == 'identity' %}An identity signs its own record with the key it announces.{% else %}It verifies against the public key of <a href="{{ node_url(a.signer_id) }}">{{ a.signer }}</a>.{% endif %}</p>
+    <div class="acq-rows acq-rows-wide">
+      {% if a.kind != 'identity' %}<div class="acq-row"><span class="acq-label">Signer</span><a href="{{ node_url(a.signer_id) }}">{{ a.signer }}</a></div>{% endif %}
+      <div class="acq-row"><span class="acq-label">Checked</span>{% if a.verified %}<span class="text-green">yes, by the server when it received the record</span>{% else %}<span class="text-orange">not checked</span>{% endif %}</div>
+      <div class="acq-row"><span class="acq-label">Signature</span><code class="text-break" data-copy="{{ a.signature }}" title="click to copy" style="cursor: copy">{{ a.signature }}</code></div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if a.signed_rows %}
+<div class="card mt-3 spy-target" id="signed">
+  <div class="card-header"><h3 class="card-title">Signed Attestations</h3><div class="card-actions text-secondary">{{ a.signed_rows|length }}{% if a.signed_rows|length >= 50 %}+{% endif %}, newest first</div></div>
+  <div class="list-group list-group-flush">
+    {% for r in a.signed_rows %}
+    <div class="list-group-item d-flex flex-wrap align-items-center gap-2">
+      <a href="{{ node_url(r.id) }}" class="badge badge-sm {{ type_badge_class('attest:' ~ r.kind|capitalize ~ 'Attestation') }} text-decoration-none">{{ r.kind }}</a>
+      <a href="{{ node_url(r.subject) }}">{{ node_code(r.subject) }}</a>
+      <span class="text-secondary ms-auto">{{ (r.record.attested_at or '')[:10] }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{{ m.triples_section(raw_triples, node.qualified_name, raw_total) }}
+{% endcall %}
+{% endblock %}

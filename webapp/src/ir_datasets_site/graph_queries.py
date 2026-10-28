@@ -504,20 +504,22 @@ def _identity_name(store, identity):
     return record.get('username') or identity.split(':', 1)[-1][:8]
 
 
-def _attestation_row(store, name):
+def attestation_row(store, name):
     """One attestation node as ``attestations``' row shape, or ``None`` if it isn't one."""
     data = node_data(store, name)
     kind = next((k for k in map(attestations.kind_of, data.types) if k), None) if data else None
     if kind is None:
         return None
     record = (data.values.get('record') or [{}])[0]
-    signer = None
+    signer = signer_id = None
     for quad in store.quads_for_pattern(node_iri(name), edge_iri(_SIGNED_BY), None):
-        signer = _identity_name(store, node_name(quad.object))
+        signer_id = node_name(quad.object)
+        signer = _identity_name(store, signer_id)
     if kind == 'identity':
-        signer = record.get('username')
+        signer, signer_id = record.get('username'), name
     return {'id': name, 'kind': kind, 'subject': record.get('subject'), 'record': record,
-            'signed': 'signature' in data.values, 'signer': signer,
+            'signed': 'signature' in data.values, 'signer': signer, 'signer_id': signer_id,
+            'signature': (data.values.get('signature') or [None])[0],
             'verified': (data.values.get('verified') or ['false'])[0] == 'true'}
 
 
@@ -526,10 +528,19 @@ def attestations_of(store, name):
     store has no ``attest`` provider)."""
     rows = []
     for quad in store.quads_for_pattern(node_iri(name), edge_iri(_ATTESTATION), None):
-        row = _attestation_row(store, node_name(quad.object))
+        row = attestation_row(store, node_name(quad.object))
         if row:
             rows.append(row)
     return rows
+
+
+def signed_by(store, identity, limit=50):
+    """The attestations signed by identity node ``identity``, newest first (at most ``limit``)."""
+    rows = [attestation_row(store, node_name(q.subject))
+            for q in store.quads_for_pattern(None, edge_iri(_SIGNED_BY), node_iri(identity))]
+    rows = [r for r in rows if r]
+    rows.sort(key=lambda r: r['record'].get('attested_at') or '', reverse=True)
+    return rows[:limit]
 
 
 _all_attestations_cache = None
@@ -541,6 +552,6 @@ def all_attestations(store):
     global _all_attestations_cache
     if _all_attestations_cache is None:
         names, _ = list_nodes(store, type_filter=_ATTESTATION_TYPE, limit=MAX_OVERVIEW_ATTESTATIONS)
-        _all_attestations_cache = [r for r in (_attestation_row(store, n) for n, _ in names) if r]
+        _all_attestations_cache = [r for r in (attestation_row(store, n) for n, _ in names) if r]
     return _all_attestations_cache
 

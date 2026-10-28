@@ -90,6 +90,17 @@ class TestSummarize(unittest.TestCase):
         self.assertEqual(0, at.summarize([row('identity', {'username': 'x'}, subject=None)])['total'])
 
 
+class TestCompareHash(unittest.TestCase):
+    def test_against_the_others(self):
+        mine = hash_row(SHA_A, 'md5:' + 'c' * 32)
+        mine['id'] = 'mine'
+        others = [hash_row(SHA_A), hash_row(SHA_B), hash_row(SHA_B, hash_version=1), mine,
+                  row('visual', {'verdict': 'ok'})]
+        by_algo = {c['algo']: c for c in at.compare_hash(mine, others)}
+        self.assertEqual((1, 1), (by_algo['sha256']['agree'], by_algo['sha256']['differ']))   # the table hash is not compared
+        self.assertEqual((0, 0), (by_algo['md5']['agree'], by_algo['md5']['differ']))
+
+
 class TestKind(unittest.TestCase):
     def test_kind_of(self):
         self.assertEqual('hash', at.kind_of('attest:HashAttestation'))
