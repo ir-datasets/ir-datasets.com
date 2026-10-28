@@ -9,8 +9,8 @@
 {% endfor %}
 {% set sections = [('overview', 'Overview')]
   + ([('related', 'Related Nodes')] if derived or validates else [])
-  + ([('verification', 'Verification')] if verification else [])
   + [('use-it', 'Use It')]
+  + ([('verification', 'Verification')] if verification else [])
   + [('raw-triples', 'Raw Triples')] %}
 {% set sections = with_about(sections, node) %}
 {% call m.spy_layout(sections, node) %}
@@ -188,9 +188,9 @@
 </div>
 {% endif %}
 
-{{ m.verification_card(verification, node) }}
-
 {{ m.use_it_section(snippet, package=package, requires=requires, variants=snippet_variants) }}
+
+{{ m.verification_card(verification, node) }}
 
 {{ m.triples_section(raw_triples, node.qualified_name, raw_total) }}
 {% endcall %}

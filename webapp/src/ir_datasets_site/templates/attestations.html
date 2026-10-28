@@ -11,8 +11,8 @@
     the data in this catalog gets checked by people other than whoever wrote the code that loads it.</p>
     <p>Anybody can submit one anonymously. To make an attestation count as coming from <em>you</em>, register an identity (a key pair) and
     your submissions are signed with it. Attestations are held by a small server at <code>attest.ir-datasets.com</code> and appear in the graph as
-    <a href="{{ url_for('provider', prefix='attest') }}"><code>attest:</code></a> nodes, with an <code>attest:attestation</code> edge from the node each one is about. A node with attestations
-    gets a <strong>Verification</strong> card summarizing them.</p>
+    <a href="{{ url_for('provider', prefix='attest') }}"><code>attest:</code></a> nodes, with an <code>attest:attestation</code> edge from the node each one is about. Every file, table and benchmark
+    has a <strong>Verification</strong> card, with a section for each kind of attestation that can be made about it, summarizing what has been attested (or inviting the first one).</p>
     <p class="mb-0">Submit with the <code>ir_datasets attest</code> command or from Python (below); see <a href="https://github.com/ir-datasets/ir-datasets/blob/v2/ir_datasets/v2/attest/README.md">its README</a> for the details.</p>
   </div>
 </div>

@@ -6,8 +6,9 @@
 {% set sections = [('overview', 'Overview')]
   + ([('related', 'Related Nodes')] if related.sources or related.derived_from or related.used_by else [])
   + ([('samples', 'Sample Rows')] if sample_table[1] else [])
+  + [('use-it', 'Use It')]
   + ([('verification', 'Verification')] if verification else [])
-  + [('use-it', 'Use It'), ('raw-triples', 'Raw Triples')]
+  + [('raw-triples', 'Raw Triples')]
   + ([('frozen', 'Declared Facts')] if frozen else []) %}
 {% set sections = with_about(sections, node) %}
 {% call m.spy_layout(sections, node) %}
@@ -171,9 +172,9 @@
 </div>
 {% endif %}
 
-{{ m.verification_card(verification, node) }}
-
 {{ m.use_it_section(snippet, package=package, requires=requires, variants=snippet_variants) }}
+
+{{ m.verification_card(verification, node) }}
 
 {{ m.triples_section(raw_triples, node.qualified_name, raw_total) }}
 {{ m.frozen_section(frozen) }}

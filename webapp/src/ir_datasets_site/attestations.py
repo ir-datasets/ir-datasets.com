@@ -8,12 +8,14 @@ has a signature, ``verified`` whether the server checked that signature on recei
 the signing identity's username (or ``None``).
 """
 import collections
+import itertools
 
 KINDS = ('hash', 'visual', 'evaluation', 'identity')
 
 #: Overall status, most important first. ``verified`` needs agreement among more than one
 #: attestation, or one that matches the hash the node declares: a single anonymous hash proves little.
 STATUSES = {
+    'none': ('Not yet attested', 'bg-yellow-lt', 'Nobody has attested to this yet.'),
     'conflict': ('Hash conflict', 'bg-red-lt', 'Attestations disagree about the data, or differ from the hash the node declares.'),
     'issues': ('Issues reported', 'bg-orange-lt', 'Someone who inspected the data reported problems.'),
     'verified': ('Verified', 'bg-green-lt', 'Hash attestations agree with each other or with the declared hash.'),
@@ -83,9 +85,12 @@ def summarize(rows, declared_hashes=()):
                            'notes': r['record'].get('notes') or '', 'sample': len(r['record'].get('sample') or []),
                            'date': _date(r['record']), 'id': r['id']} for r in by_kind['visual']),
                          key=lambda v: (v['verdict'] != 'issues', v['date']))
-    evaluations = sorted(({'system': r['record'].get('system'), 'measures': r['record'].get('measures') or {},
+    entries = sorted(({'system': r['record'].get('system'), 'measures': r['record'].get('measures') or {},
                            'who': _who(r), 'date': _date(r['record']), 'id': r['id']} for r in by_kind['evaluation']),
                          key=lambda e: (e['system'] or '', e['date']))
+    evaluations = entries
+    systems = [{'system': system, 'entries': list(group)}
+               for system, group in itertools.groupby(entries, key=lambda e: e['system'])]
     issues = [v for v in inspections if v['verdict'] == 'issues']
     # distinct agreeing attestations (a record is one attestation however many algorithms it carries)
     agreeing = len(by_kind['hash'])
@@ -97,6 +102,8 @@ def summarize(rows, declared_hashes=()):
         status = 'verified'
     elif evaluations and not by_kind['hash'] and not by_kind['visual']:
         status = 'evaluated'
+    elif not rows:
+        status = 'none'
     else:
         status = 'attested'
     label, badge, explanation = STATUSES[status]
@@ -105,7 +112,7 @@ def summarize(rows, declared_hashes=()):
         'signed': sum(1 for r in rows if r.get('signed')),
         'status': status, 'label': label, 'badge': badge, 'explanation': explanation,
         'hashes': hashes, 'matches_declared': matches_declared, 'declared': bool(declared_hashes),
-        'inspections': inspections, 'evaluations': evaluations,
+        'inspections': inspections, 'evaluations': evaluations, 'systems': systems,
         'measures': sorted({m for e in evaluations for m in e['measures']}),
     }
 

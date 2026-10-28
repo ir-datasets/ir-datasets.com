@@ -1028,20 +1028,25 @@ def class_page(qualified):
         rows=[_row_dict(name, ts) for name, ts in rows], total=total, shown=len(rows))
 
 
-def _verification(node, qualified):
-    """The Verification card's content for a node, or ``None`` if nothing has been attested about it
-    (or it isn't in the store, like a live-fallback ``hf:`` node)."""
-    if not isinstance(node, gq.NodeView):
-        return None
-    rows = gq.attestations_of(store, qualified)
-    if not rows:
-        return None
-    summary = attest_summary.summarize(rows, node.metadata.get('fileHash') or ())
-    # what a visitor could add: hashes for data and tables, a visual check for tables, scores for a benchmark
-    types = node.types
-    summary['can_attest'] = (['hash'] if any(v2.is_subclass(t, v2.DATA) or v2.is_subclass(t, v2.TABLE) for t in types) else []) \
-        + (['visual'] if any(v2.is_subclass(t, v2.TABLE) for t in types) else []) \
+def _attestable(node):
+    """Which kinds of attestation can be made about a node: hashes for a file or a table, a visual check
+    for a table, scores for a benchmark. Empty for everything else (a directory, a suite, a bundle...)."""
+    types = getattr(node, 'types', None) or [node.type]
+    is_table = any(v2.is_subclass(t, v2.TABLE) for t in types)
+    return (['hash'] if is_table or any(v2.is_subclass(t, v2.FILE) for t in types) else []) \
+        + (['visual'] if is_table else []) \
         + (['evaluation'] if any(v2.is_subclass(t, v2.BENCHMARK) and not v2.is_subclass(t, v2.SUITE) for t in types) else [])
+
+
+def _verification(node, qualified):
+    """The Verification card's content for a node -- shown whenever something can be attested about it, even
+    if nothing has been yet -- or ``None`` for a node it doesn't apply to."""
+    can_attest = _attestable(node)
+    if not can_attest:
+        return None
+    rows = gq.attestations_of(store, qualified) if isinstance(node, gq.NodeView) else []
+    summary = attest_summary.summarize(rows, node.metadata.get('fileHash') or ())
+    summary['can_attest'] = can_attest
     return summary
 
 

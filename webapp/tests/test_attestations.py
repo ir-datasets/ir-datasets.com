@@ -18,7 +18,7 @@ def hash_row(*hashes, signer=None, **kw):
 class TestSummarize(unittest.TestCase):
     def test_nothing(self):
         s = at.summarize([])
-        self.assertEqual(('attested', 0), (s['status'], s['total']))
+        self.assertEqual(('none', 0), (s['status'], s['total']))
 
     def test_one_anonymous_hash_is_only_attested(self):
         s = at.summarize([hash_row(SHA_A)])
@@ -70,6 +70,7 @@ class TestSummarize(unittest.TestCase):
                           row('evaluation', {'system': 'ANCE', 'measures': {'nDCG@10': 0.4}})])
         self.assertEqual(['ANCE', 'BM25'], [e['system'] for e in s['evaluations']])
         self.assertEqual(['MAP', 'nDCG@10'], s['measures'])
+        self.assertEqual([('ANCE', 1), ('BM25', 1)], [(g['system'], len(g['entries'])) for g in s['systems']])
         self.assertEqual((None, 'dana'), (s['evaluations'][0]['who'], s['evaluations'][1]['who']))
         self.assertEqual('evaluated', s['status'])
         s = at.summarize([hash_row(SHA_A), row('evaluation', {'system': 'x', 'measures': {'m': 1}})])
