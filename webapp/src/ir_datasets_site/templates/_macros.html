@@ -273,7 +273,7 @@
 {# One row of a node's Overview box: whether it has been verified, linking to the Verification card. #}
 {% macro verification_row(v) %}
 {% if v %}
-          <div class="acq-row"><span class="acq-label">Verification</span><span><a href="#verification" class="badge badge-sm {{ v.badge }} text-decoration-none">{{ v.label }}</a>{% if v.total %} <span class="text-secondary">{{ v.total }} attestation{{ '' if v.total == 1 else 's' }}{% if v.signed %}, {{ v.signed }} signed{% endif %}</span>{% endif %}</span></div>
+          <div class="acq-row"><span class="acq-label">Verification</span><span><a href="#verification" class="fw-semibold text-{{ v.badge[3:-3] }} text-decoration-none">{{ v.label }}</a>{% if v.total %} <span class="text-secondary">{{ v.total }} attestation{{ '' if v.total == 1 else 's' }}{% if v.signed %}, {{ v.signed }} signed{% endif %}</span>{% endif %}</span></div>
 {% endif %}
 {% endmacro %}
 
@@ -309,13 +309,12 @@
 <div class="card mt-3 spy-target" id="verification">
   <div class="card-header">
     <h3 class="card-title">Verification</h3>
-    <span class="badge {{ v.badge }} ms-2">{{ v.label }}</span>
     <div class="variant-pills ms-3" role="group" aria-label="Kind of attestation" data-verif-pills>
       {% for k in v.can_attest %}<button type="button" class="variant-pill{% if k == ns.shown %} active{% endif %}" data-verif="{{ k }}" aria-pressed="{{ 'true' if k == ns.shown else 'false' }}">{{ labels[k] }} <span class="pill-count">{{ v.counts[k] }}</span></button>{% endfor %}
     </div>
   </div>
   <div class="card-body border-bottom py-2 text-secondary">
-    {{ v.explanation }}{% if v.declared and v.hashes and not v.matches_declared and v.status != 'conflict' %} None of the attested hashes use an algorithm this node declares a hash in, so they could not be checked against it.{% endif %}
+    <strong class="text-{{ v.badge[3:-3] }}">{{ v.label }}.</strong> {{ v.explanation }}{% if v.declared and v.hashes and not v.matches_declared and v.status != 'conflict' %} None of the attested hashes use an algorithm this node declares a hash in, so they could not be checked against it.{% endif %}
     <a href="{{ url_for('attestations') }}" class="ms-1">About attestations</a>{% if v.total %} <span class="ms-1">&middot; {{ v.total }} attestation{{ '' if v.total == 1 else 's' }}{% if v.signed %}, {{ v.signed }} signed{% endif %}</span>{% endif %}
   </div>
 
@@ -326,9 +325,9 @@
             <span class="acq-label"><code>{{ h.algo }}</code> of the {{ h.scope }}</span>
             <span>
               <code class="text-break" data-copy="{{ h.digest }}" title="click to copy" style="cursor: copy">{{ h.digest }}</code>
-              {% if h.matches_declared == true %}<span class="badge badge-sm bg-green-lt ms-1">matches the declared hash</span>{% elif h.matches_declared == false %}<span class="badge badge-sm bg-red-lt ms-1">differs from the declared hash</span>{% endif %}
-              {% if h.disagrees %}<span class="badge badge-sm bg-red-lt ms-1">disagrees with another attestation</span>{% elif h.count > 1 %}<span class="badge badge-sm bg-green-lt ms-1">{{ h.count }} agree</span>{% endif %}
-              <div class="text-secondary small">{{ h.count }} attestation{{ '' if h.count == 1 else 's' }}{% if h.signers %} &middot; {{ h.signers|join(', ') }}{% endif %}{% if h.anonymous %} &middot; {{ h.anonymous }} anonymous{% endif %}{% for src in h.sources %} &middot; from <span class="text-break">{{ src }}</span>{% endfor %}</div>
+              <div class="text-secondary small">{{ h.count }} attestation{{ '' if h.count == 1 else 's' }}{% if h.signers %} &middot; {{ h.signers|join(', ') }}{% endif %}{% if h.anonymous %} &middot; {{ h.anonymous }} anonymous{% endif %}{% for src in h.sources %} &middot; from <span class="text-break">{{ src }}</span>{% endfor %}
+                {%- if h.matches_declared == true %} &middot; <span class="text-green">matches the declared hash</span>{% elif h.matches_declared == false %} &middot; <span class="text-red">differs from the declared hash</span>{% endif %}
+                {%- if h.disagrees %} &middot; <span class="text-red">disagrees with another attestation</span>{% elif h.count > 1 %} &middot; <span class="text-green">all agree</span>{% endif %}</div>
             </span>
           </div>
           {% else %}
@@ -342,7 +341,7 @@
   {% call _verification_pane('visual', ns.shown == 'visual', 'Someone looked through a sample of the records and either they looked right or they found problems. Always signed.') %}
           {% for i in v.inspections %}
           <div class="acq-row">
-            <span class="acq-label"><span class="badge badge-sm {{ 'bg-green-lt' if i.verdict == 'ok' else 'bg-orange-lt' }}">{{ 'looks right' if i.verdict == 'ok' else 'issues' }}</span></span>
+            <span class="acq-label {{ 'text-green' if i.verdict == 'ok' else 'text-orange' }}">{{ 'looks right' if i.verdict == 'ok' else 'issues' }}</span>
             <span>
               <strong>{{ i.who or 'anonymous' }}</strong>
               <span class="text-secondary">&middot; {{ i.date }}{% if i.sample %} &middot; {{ i.sample }} record{{ '' if i.sample == 1 else 's' }} checked{% endif %}</span>
@@ -363,7 +362,7 @@
             <span class="acq-label text-body fw-semibold">{{ sys.system }}</span>
             <span>
               {% for e in sys.entries %}
-              <div>{% for k, val in e.measures.items() %}<span class="badge bg-secondary-lt me-1">{{ k }} <strong>{{ '%.4g'|format(val) }}</strong></span>{% endfor %} <span class="text-secondary small">{{ e.who or 'anonymous' }} &middot; {{ e.date }}</span></div>
+              <div>{% for k, val in e.measures.items() %}<span class="me-3"><span class="text-secondary">{{ k }}</span> <strong>{{ '%.4g'|format(val) }}</strong></span>{% endfor %} <span class="text-secondary small">{{ e.who or 'anonymous' }} &middot; {{ e.date }}</span></div>
               {% endfor %}
             </span>
           </div>
