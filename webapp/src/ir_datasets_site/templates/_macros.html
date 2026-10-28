@@ -278,7 +278,7 @@
 {% endmacro %}
 
 {# One kind's pane of the Verification card: a plain line on what it verifies, a datagrid (status, count, most recent), and at
-   the bottom, like the Installation card, the command to add one. #}
+   the bottom, labeled like the datagrid's items, the command to add one. #}
 {% macro _verification_pane(kind, shown, v, description, command) %}
 {% set status = v.kind_status[kind] %}
 {% set latest = v.latest[kind] %}
@@ -305,7 +305,10 @@
         </div>
       </div>
     </div>
-    <pre class="bg-secondary-lt p-3 overflow-auto mb-0" style="border-radius: 0"><code class="language-bash">{{ command }}</code></pre>
+    <div class="card-body bg-secondary-lt">
+      <div class="datagrid-title">Contribute</div>
+      <pre class="p-0 mb-0 overflow-auto" style="background: transparent; color: inherit"><code class="language-bash">{{ command }}</code></pre>
+    </div>
   </div>
 {% endmacro %}
 
